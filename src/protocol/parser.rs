@@ -1,5 +1,6 @@
 use bytes::{Bytes, BytesMut};
 use nom::{IResult, bytes::complete::take, number::complete::{be_u8, be_u16}};
+use anyhow::Result;
 
 /// 从BytesMut中读取并解析MQTT数据包
 pub fn read_from_bytes_mut(buf: &mut BytesMut) -> Option<Bytes> {
@@ -351,4 +352,39 @@ pub fn parse_ping_resp(input: &[u8]) -> IResult<&[u8], ()> {
 /// 解析DISCONNECT数据包
 pub fn parse_disconnect(input: &[u8]) -> IResult<&[u8], ()> {
     Ok((input, ()))
+}
+
+/// 将nom错误转换为anyhow错误
+fn nom_to_anyhow<T>(result: IResult<&[u8], T>, context: &str) -> Result<T> {
+    match result {
+        Ok((_, value)) => Ok(value),
+        Err(nom::Err::Incomplete(_)) => Err(anyhow::anyhow!("{}: incomplete data", context)),
+        Err(nom::Err::Error(e)) => Err(anyhow::anyhow!("{}: parsing error: {:?}", context, e)),
+        Err(nom::Err::Failure(e)) => Err(anyhow::anyhow!("{}: parsing failure: {:?}", context, e)),
+    }
+}
+
+/// 解析MQTT数据包（使用anyhow错误处理）
+pub fn parse_packet_anyhow(input: &[u8]) -> Result<super::MqttPacket> {
+    nom_to_anyhow(parse_packet(input), "parse MQTT packet")
+}
+
+/// 解析固定头（使用anyhow错误处理）
+pub fn parse_fixed_header_anyhow(input: &[u8]) -> Result<super::FixedHeader> {
+    nom_to_anyhow(parse_fixed_header(input), "parse fixed header")
+}
+
+/// 解析CONNECT数据包（使用anyhow错误处理）
+pub fn parse_connect_anyhow(input: &[u8]) -> Result<super::connect::ConnectPacket> {
+    nom_to_anyhow(parse_connect(input), "parse CONNECT packet")
+}
+
+/// 解析PUBLISH数据包（使用anyhow错误处理）
+pub fn parse_publish_anyhow(input: &[u8], flags: u8) -> Result<super::publish::PublishPacket> {
+    nom_to_anyhow(parse_publish(input, flags), "parse PUBLISH packet")
+}
+
+/// 解析SUBSCRIBE数据包（使用anyhow错误处理）
+pub fn parse_subscribe_anyhow(input: &[u8]) -> Result<super::subscribe::SubscribePacket> {
+    nom_to_anyhow(parse_subscribe(input), "parse SUBSCRIBE packet")
 }
