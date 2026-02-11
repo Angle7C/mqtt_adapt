@@ -1,4 +1,4 @@
-use bytes::{Buf, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 pub mod connect;
 pub mod connack;
@@ -11,6 +11,86 @@ pub mod subscribe;
 pub mod suback;
 pub mod unsubscribe;
 pub mod unsuback;
+
+/// 写入MQTT剩余长度
+/// MQTT剩余长度使用可变长度编码，最多4字节
+pub fn write_remaining_length(buf: &mut BytesMut, length: usize) {
+    let mut value = length as u32;
+    loop {
+        let mut byte = (value & 0x7F) as u8;
+        value >>= 7;
+        if value > 0 {
+            byte |= 0x80;
+        }
+        buf.put_u8(byte);
+        if value == 0 {
+            break;
+        }
+    }
+}
+
+/// 写入MQTT字符串
+/// MQTT字符串由两字节长度前缀和UTF-8编码的字符串内容组成
+pub fn write_mqtt_string(buf: &mut BytesMut, s: &str) {
+    let length = s.len() as u16;
+    buf.put_u16(length);
+    buf.put_slice(s.as_bytes());
+}
+
+/// 写入MQTT二进制数据
+/// MQTT二进制数据由两字节长度前缀和字节内容组成
+pub fn write_mqtt_bytes(buf: &mut BytesMut, bytes: &[u8]) {
+    let length = bytes.len() as u16;
+    buf.put_u16(length);
+    buf.put_slice(bytes);
+}
+
+/// 为MqttPacket实现序列化方法
+impl MqttPacket {
+    /// 将MQTT数据包序列化为字节并写入缓冲区
+    pub fn write(&self, buf: &mut BytesMut) {
+        match self {
+            MqttPacket::Connect(packet) => packet.write(buf),
+            MqttPacket::ConnAck(packet) => packet.write(buf),
+            MqttPacket::Publish(packet) => packet.write(buf),
+            MqttPacket::PubAck(packet) => packet.write(buf),
+            MqttPacket::PubRec(packet) => packet.write(buf),
+            MqttPacket::PubRel(packet) => packet.write(buf),
+            MqttPacket::PubComp(packet) => packet.write(buf),
+            MqttPacket::Subscribe(packet) => packet.write(buf),
+            MqttPacket::SubAck(packet) => packet.write(buf),
+            MqttPacket::Unsubscribe(packet) => packet.write(buf),
+            MqttPacket::UnsubAck(packet) => packet.write(buf),
+            MqttPacket::PingReq => {
+                // PINGREQ数据包只包含固定头
+                let packet_type = PacketType::PingReq as u8;
+                let flags = 0x00;
+                let first_byte = (packet_type << 4) | flags;
+                buf.put_u8(first_byte);
+                // 剩余长度为0
+                buf.put_u8(0x00);
+            },
+            MqttPacket::PingResp => {
+                // PINGRESP数据包只包含固定头
+                let packet_type = PacketType::PingResp as u8;
+                let flags = 0x00;
+                let first_byte = (packet_type << 4) | flags;
+                buf.put_u8(first_byte);
+                // 剩余长度为0
+                buf.put_u8(0x00);
+            },
+            MqttPacket::Disconnect => {
+                // DISCONNECT数据包只包含固定头
+                let packet_type = PacketType::Disconnect as u8;
+                let flags = 0x00;
+                let first_byte = (packet_type << 4) | flags;
+                buf.put_u8(first_byte);
+                // 剩余长度为0
+                buf.put_u8(0x00);
+            },
+        }
+    }
+}
 
 /// MQTT固定头结构
 /// MQTT固定头

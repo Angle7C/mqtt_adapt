@@ -1,4 +1,8 @@
-use bytes::{Buf, Bytes, BytesMut};
+use super::write_mqtt_bytes;
+use super::write_mqtt_string;
+use super::write_remaining_length;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+
 /// CONNECT数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectPacket {
@@ -119,5 +123,88 @@ impl ConnectPacket {
     pub fn from_bytes(bytes: &mut std::slice::Iter<u8>) -> Result<Self, String> {
         // 注意：此方法已被废弃，建议使用parse_connect函数
         Err("from_bytes method is deprecated, use parse_connect instead".to_string())
+    }
+    
+    /// 将CONNECT数据包序列化为字节并写入缓冲区
+    pub fn write(&self, buf: &mut BytesMut) {
+        // 计算可变头和载荷长度
+        let mut variable_header_length = 0;
+        
+        // 协议名称长度
+        variable_header_length += 2 + self.protocol_name.len();
+        // 协议级别长度
+        variable_header_length += 1;
+        // 连接标志长度
+        variable_header_length += 1;
+        // 保活时间长度
+        variable_header_length += 2;
+        
+        // 载荷长度
+        let mut payload_length = 0;
+        
+        // 客户端标识符长度
+        payload_length += 2 + self.client_id.len();
+        
+        // 遗嘱主题和遗嘱消息长度（如果有）
+        if let Some(topic) = &self.will_topic {
+            payload_length += 2 + topic.len();
+        }
+        if let Some(message) = &self.will_message {
+            payload_length += 2 + message.len();
+        }
+        
+        // 用户名长度（如果有）
+        if let Some(username) = &self.username {
+            payload_length += 2 + username.len();
+        }
+        
+        // 密码长度（如果有）
+        if let Some(password) = &self.password {
+            payload_length += 2 + password.len();
+        }
+        
+        // 总剩余长度
+        let remaining_length = variable_header_length + payload_length;
+        
+        // 写入固定头
+        let packet_type = 1; // CONNECT
+        let flags = 0x00; // CONNECT固定标志位为0x00
+        let first_byte = (packet_type << 4) | flags;
+        buf.put_u8(first_byte);
+        
+        // 写入剩余长度
+        write_remaining_length(buf, remaining_length);
+        
+        // 写入可变头
+        // 协议名称
+        write_mqtt_string(buf, &self.protocol_name);
+        // 协议级别
+        buf.put_u8(self.protocol_level);
+        // 连接标志
+        buf.put_u8(self.connect_flags);
+        // 保活时间
+        buf.put_u16(self.keep_alive);
+        
+        // 写入载荷
+        // 客户端标识符
+        write_mqtt_string(buf, &self.client_id);
+        
+        // 遗嘱主题和遗嘱消息（如果有）
+        if let Some(topic) = &self.will_topic {
+            write_mqtt_string(buf, topic);
+        }
+        if let Some(message) = &self.will_message {
+            write_mqtt_bytes(buf, message);
+        }
+        
+        // 用户名（如果有）
+        if let Some(username) = &self.username {
+            write_mqtt_string(buf, username);
+        }
+        
+        // 密码（如果有）
+        if let Some(password) = &self.password {
+            write_mqtt_bytes(buf, password);
+        }
     }
 }
