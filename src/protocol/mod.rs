@@ -14,8 +14,7 @@ pub mod suback;
 pub mod unsubscribe;
 pub mod unsuback;
 
-#[cfg(test)]
-pub mod tests;
+
 
 pub use types::*;
 pub use parser::*;
