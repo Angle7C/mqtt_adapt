@@ -1,4 +1,4 @@
-use nom::{IResult, number::complete::be_u16};
+use bytes::{Buf, BytesMut};
 
 /// PUBACK数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7,7 +7,11 @@ pub struct PubAckPacket {
 }
 
 /// 解析PUBACK数据包
-pub fn parse_puback(input: &[u8]) -> IResult<&[u8], PubAckPacket> {
-    let (input, packet_id) = be_u16(input)?;
-    Ok((input, PubAckPacket { packet_id }))
+pub fn parse_puback(input: &mut BytesMut) -> Result<PubAckPacket, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for PUBACK packet".to_string());
+    }
+    
+    let packet_id = input.get_u16();
+    Ok(PubAckPacket { packet_id })
 }

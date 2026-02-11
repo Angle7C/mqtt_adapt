@@ -1,4 +1,4 @@
-use nom::{IResult, number::complete::be_u16};
+use bytes::{Buf, BytesMut};
 
 /// PUBREC数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -7,7 +7,11 @@ pub struct PubRecPacket {
 }
 
 /// 解析PUBREC数据包
-pub fn parse_pubrec(input: &[u8]) -> IResult<&[u8], PubRecPacket> {
-    let (input, packet_id) = be_u16(input)?;
-    Ok((input, PubRecPacket { packet_id }))
+pub fn parse_pubrec(input: &mut BytesMut) -> Result<PubRecPacket, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for PUBREC packet".to_string());
+    }
+    
+    let packet_id = input.get_u16();
+    Ok(PubRecPacket { packet_id })
 }

@@ -1,5 +1,4 @@
-use bytes::Bytes;
-use nom::{IResult, bytes::complete::take, number::complete::{be_u8, be_u16}};
+use bytes::{Buf, Bytes, BytesMut};
 
 /// PUBLISH数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,39 +12,50 @@ pub struct PublishPacket {
 }
 
 /// 解析MQTT字符串
-fn parse_mqtt_string(input: &[u8]) -> IResult<&[u8], String> {
-    let (input, length) = be_u16(input)?;
-    let (input, bytes) = take(length)(input)?;
-    let string = String::from_utf8_lossy(bytes).to_string();
-    Ok((input, string))
+fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for MQTT string length".to_string());
+    }
+    
+    let length = input.get_u16() as usize;
+    
+    if input.len() < length {
+        return Err("Insufficient data for MQTT string content".to_string());
+    }
+    
+    let bytes = input.split_to(length);
+    let string = String::from_utf8_lossy(&bytes).to_string();
+    Ok(string)
 }
 
 /// 解析PUBLISH数据包
-pub fn parse_publish(input: &[u8], flags: u8) -> IResult<&[u8], PublishPacket> {
+pub fn parse_publish(input: &mut BytesMut, flags: u8) -> Result<PublishPacket, String> {
     let dup = (flags & 0x08) != 0;
     let qos = (flags & 0x06) >> 1;
     let retain = (flags & 0x01) != 0;
     
-    let (input, topic_name) = parse_mqtt_string(input)?;
+    let topic_name = parse_mqtt_string(input)?; 
     
     let mut packet_id = None;
-    let mut input = input;
     
     if qos > 0 {
-        let (rest, id) = be_u16(input)?;
+        if input.len() < 2 {
+            return Err("Insufficient data for packet ID".to_string());
+        }
+        
+        let id = input.get_u16();
         packet_id = Some(id);
-        input = rest;
     }
     
     // 剩余的都是payload
-    let (input, payload) = take(input.len())(input)?;
+    let payload = input.split().freeze();
     
-    Ok((input, PublishPacket {
+    Ok(PublishPacket {
         dup,
         qos,
         retain,
         topic_name,
         packet_id,
-        payload: Bytes::copy_from_slice(payload),
-    }))
+        payload,
+    })
 }

@@ -1,5 +1,5 @@
 use super::ConnectReturnCode;
-use nom::{IResult, number::complete::be_u8};
+use bytes::{Buf, BytesMut};
 
 /// CONNACK数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,15 +9,19 @@ pub struct ConnAckPacket {
 }
 
 /// 解析CONNACK数据包
-pub fn parse_connack(input: &[u8]) -> IResult<&[u8], ConnAckPacket> {
-    let (input, flags) = be_u8(input)?;
-    let (input, return_code) = be_u8(input)?;
+pub fn parse_connack(input: &mut BytesMut) -> Result<ConnAckPacket, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for CONNACK packet".to_string());
+    }
+    
+    let flags = input.get_u8();
+    let return_code_value = input.get_u8();
     
     let session_present = (flags & 0x01) != 0;
-    let return_code = ConnectReturnCode::from_u8(return_code).ok_or(nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))?;
+    let return_code = ConnectReturnCode::from_u8(return_code_value).ok_or("Invalid return code".to_string())?;
     
-    Ok((input, ConnAckPacket {
+    Ok(ConnAckPacket {
         session_present,
         return_code,
-    }))
+    })
 }

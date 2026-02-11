@@ -1,4 +1,4 @@
-use nom::{IResult, bytes::complete::take, number::complete::{be_u8, be_u16}};
+use bytes::{Buf, BytesMut};
 
 /// SUBSCRIBE数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8,29 +8,45 @@ pub struct SubscribePacket {
 }
 
 /// 解析MQTT字符串
-fn parse_mqtt_string(input: &[u8]) -> IResult<&[u8], String> {
-    let (input, length) = be_u16(input)?;
-    let (input, bytes) = take(length)(input)?;
-    let string = String::from_utf8_lossy(bytes).to_string();
-    Ok((input, string))
+fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for MQTT string length".to_string());
+    }
+    
+    let length = input.get_u16() as usize;
+    
+    if input.len() < length {
+        return Err("Insufficient data for MQTT string content".to_string());
+    }
+    
+    let bytes = input.split_to(length);
+    let string = String::from_utf8_lossy(&bytes).to_string();
+    Ok(string)
 }
 
 /// 解析SUBSCRIBE数据包
-pub fn parse_subscribe(input: &[u8]) -> IResult<&[u8], SubscribePacket> {
-    let (input, packet_id) = be_u16(input)?;
-    
-    let mut topics = Vec::new();
-    let mut input = input;
-    
-    while !input.is_empty() {
-        let (rest, topic) = parse_mqtt_string(input)?;
-        let (rest, qos) = be_u8(rest)?;
-        topics.push((topic, qos));
-        input = rest;
+pub fn parse_subscribe(input: &mut BytesMut) -> Result<SubscribePacket, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for SUBSCRIBE packet".to_string());
     }
     
-    Ok((input, SubscribePacket {
+    let packet_id = input.get_u16();
+    
+    let mut topics = Vec::new();
+    
+    while !input.is_empty() {
+        let topic = parse_mqtt_string(input)?;
+        
+        if input.is_empty() {
+            return Err("Insufficient data for QoS level".to_string());
+        }
+        
+        let qos = input.get_u8();
+        topics.push((topic, qos));
+    }
+    
+    Ok(SubscribePacket {
         packet_id,
         topics,
-    }))
+    })
 }
