@@ -1,4 +1,5 @@
 use crate::{client::Client, routing::router::MessageRouter};
+use log::{error, info};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 
@@ -34,14 +35,12 @@ impl Server {
         // 绑定TCP监听器
         let listener = TcpListener::bind(&self.addr)
             .await
-            .expect("Failed to bind address");
+            .expect("Failed to bind address");      
 
-        println!("MQTT server started on {}", self.addr);
+        info!("MQTT server started on {}", self.addr);
 
         // 处理客户端连接
         while let Ok((socket, _)) = listener.accept().await {
-            println!("New client connected");
-            
             // 克隆路由器引用
             let router_clone = self.router.clone();
             
@@ -51,11 +50,11 @@ impl Server {
                     Ok(client) => {
                         // 处理客户端连接
                         if let Err(e) = client.handle().await {
-                            println!("Error handling client: {:?}", e);
+                            error!("Error handling client: {:?}", e);
                         }
                     },
                     Err(e) => {
-                        println!("Error creating client: {:?}", e);
+                        error!("Error creating client: {:?}", e);
                     }
                 }
             });
