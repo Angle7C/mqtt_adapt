@@ -1,3 +1,5 @@
+use super::Packet;
+use super::parse_mqtt_string;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
@@ -9,53 +11,12 @@ pub struct SubscribePacket {
     pub topics: Vec<(String, u8)>,
 }
 
-/// 解析MQTT字符串
-fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for MQTT string length".to_string());
-    }
-    
-    let length = input.get_u16() as usize;
-    
-    if input.len() < length {
-        return Err("Insufficient data for MQTT string content".to_string());
-    }
-    
-    let bytes = input.split_to(length);
-    let string = String::from_utf8_lossy(&bytes).to_string();
-    Ok(string)
-}
 
-/// 解析SUBSCRIBE数据包
-pub fn parse_subscribe(input: &mut BytesMut) -> Result<SubscribePacket, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for SUBSCRIBE packet".to_string());
-    }
-    
-    let packet_id = input.get_u16();
-    
-    let mut topics = Vec::new();
-    
-    while !input.is_empty() {
-        let topic = parse_mqtt_string(input)?;
-        
-        if input.is_empty() {
-            return Err("Insufficient data for QoS level".to_string());
-        }
-        
-        let qos = input.get_u8();
-        topics.push((topic, qos));
-    }
-    
-    Ok(SubscribePacket {
-        packet_id,
-        topics,
-    })
-}
 
-impl SubscribePacket {
+
+impl Packet for SubscribePacket {
     /// 将SUBSCRIBE数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
         let mut variable_header_length = 2; // 数据包ID
         let mut payload_length = 0;
@@ -86,5 +47,32 @@ impl SubscribePacket {
             write_mqtt_string(buf, topic);
             buf.put_u8(*qos);
         }
+    }
+    
+    /// 从BytesMut解析SUBSCRIBE数据包
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+        if input.len() < 2 {
+            return Err("Insufficient data for SUBSCRIBE packet".to_string());
+        }
+        
+        let packet_id = input.get_u16();
+        
+        let mut topics = Vec::new();
+        
+        while !input.is_empty() {
+            let topic = parse_mqtt_string(input)?;
+            
+            if input.is_empty() {
+                return Err("Insufficient data for QoS level".to_string());
+            }
+            
+            let qos = input.get_u8();
+            topics.push((topic, qos));
+        }
+        
+        Ok(SubscribePacket {
+            packet_id,
+            topics,
+        })
     }
 }

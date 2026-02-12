@@ -1,4 +1,5 @@
 use super::write_remaining_length;
+use super::Packet;
 use bytes::{Buf, BufMut, BytesMut};
 
 /// PUBACK数据包
@@ -7,19 +8,11 @@ pub struct PubAckPacket {
     pub packet_id: u16,
 }
 
-/// 解析PUBACK数据包
-pub fn parse_puback(input: &mut BytesMut) -> Result<PubAckPacket, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for PUBACK packet".to_string());
-    }
-    
-    let packet_id = input.get_u16();
-    Ok(PubAckPacket { packet_id })
-}
 
-impl PubAckPacket {
+
+impl Packet for PubAckPacket {
     /// 将PUBACK数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         // 可变头长度（数据包ID）
         let variable_header_length = 2;
         
@@ -34,5 +27,15 @@ impl PubAckPacket {
         
         // 写入可变头（数据包ID）
         buf.put_u16(self.packet_id);
+    }
+    
+    /// 从BytesMut解析PUBACK数据包
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+        if input.len() < 2 {
+            return Err("Insufficient data for PUBACK packet".to_string());
+        }
+        
+        let packet_id = input.get_u16();
+        Ok(PubAckPacket { packet_id })
     }
 }

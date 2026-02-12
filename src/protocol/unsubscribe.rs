@@ -1,3 +1,5 @@
+use super::Packet;
+use super::parse_mqtt_string;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
@@ -9,47 +11,12 @@ pub struct UnsubscribePacket {
     pub topics: Vec<String>,
 }
 
-/// 解析MQTT字符串
-fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for MQTT string length".to_string());
-    }
-    
-    let length = input.get_u16() as usize;
-    
-    if input.len() < length {
-        return Err("Insufficient data for MQTT string content".to_string());
-    }
-    
-    let bytes = input.split_to(length);
-    let string = String::from_utf8_lossy(&bytes).to_string();
-    Ok(string)
-}
 
-/// 解析UNSUBSCRIBE数据包
-pub fn parse_unsubscribe(input: &mut BytesMut) -> Result<UnsubscribePacket, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for UNSUBSCRIBE packet".to_string());
-    }
-    
-    let packet_id = input.get_u16();
-    
-    let mut topics = Vec::new();
-    
-    while !input.is_empty() {
-        let topic = parse_mqtt_string(input)?;
-        topics.push(topic);
-    }
-    
-    Ok(UnsubscribePacket {
-        packet_id,
-        topics,
-    })
-}
 
-impl UnsubscribePacket {
+
+impl Packet for UnsubscribePacket {
     /// 将UNSUBSCRIBE数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
         let mut variable_header_length = 2; // 数据包ID
         let mut payload_length = 0;
@@ -78,5 +45,26 @@ impl UnsubscribePacket {
         for topic in &self.topics {
             write_mqtt_string(buf, topic);
         }
+    }
+    
+    /// 从BytesMut解析UNSUBSCRIBE数据包
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+        if input.len() < 2 {
+            return Err("Insufficient data for UNSUBSCRIBE packet".to_string());
+        }
+        
+        let packet_id = input.get_u16();
+        
+        let mut topics = Vec::new();
+        
+        while !input.is_empty() {
+            let topic = parse_mqtt_string(input)?;
+            topics.push(topic);
+        }
+        
+        Ok(UnsubscribePacket {
+            packet_id,
+            topics,
+        })
     }
 }

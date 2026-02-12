@@ -1,5 +1,14 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
+/// MQTT数据包trait，定义了数据包的基本操作
+pub trait Packet {
+    /// 将数据包序列化为字节并写入缓冲区
+    fn write(&self, buf: &mut BytesMut);
+    
+    /// 从BytesMut解析数据包
+    fn parse(input: &mut BytesMut,flags:Option<u8>) -> Result<Self, String> where Self: Sized;
+}
+
 pub mod connect;
 pub mod connack;
 pub mod publish;
@@ -11,6 +20,9 @@ pub mod subscribe;
 pub mod suback;
 pub mod unsubscribe;
 pub mod unsuback;
+pub mod pingreq;
+pub mod pingresp;
+pub mod disconnect;
 
 /// 写入MQTT剩余长度
 /// MQTT剩余长度使用可变长度编码，最多4字节
@@ -45,10 +57,45 @@ pub fn write_mqtt_bytes(buf: &mut BytesMut, bytes: &[u8]) {
     buf.put_slice(bytes);
 }
 
-/// 为MqttPacket实现序列化方法
+/// 解析MQTT字符串
+/// MQTT字符串由两字节长度前缀和UTF-8编码的字符串内容组成
+pub fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for MQTT string length".to_string());
+    }
+    
+    let length = input.get_u16() as usize;
+    
+    if input.len() < length {
+        return Err("Insufficient data for MQTT string content".to_string());
+    }
+    
+    let bytes = input.split_to(length);
+    let string = String::from_utf8_lossy(&bytes).to_string();
+    Ok(string)
+}
+
+/// 解析MQTT二进制数据
+/// MQTT二进制数据由两字节长度前缀和字节内容组成
+pub fn parse_mqtt_bytes(input: &mut BytesMut) -> Result<Bytes, String> {
+    if input.len() < 2 {
+        return Err("Insufficient data for MQTT bytes length".to_string());
+    }
+    
+    let length = input.get_u16() as usize;
+    
+    if input.len() < length {
+        return Err("Insufficient data for MQTT bytes content".to_string());
+    }
+    
+    let bytes = input.split_to(length);
+    Ok(bytes.freeze())
+}
+
+/// 为MqttPacket实现Packet trait
 impl MqttPacket {
     /// 将MQTT数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         match self {
             MqttPacket::Connect(packet) => packet.write(buf),
             MqttPacket::ConnAck(packet) => packet.write(buf),
@@ -61,35 +108,91 @@ impl MqttPacket {
             MqttPacket::SubAck(packet) => packet.write(buf),
             MqttPacket::Unsubscribe(packet) => packet.write(buf),
             MqttPacket::UnsubAck(packet) => packet.write(buf),
-            MqttPacket::PingReq => {
-                // PINGREQ数据包只包含固定头
-                let packet_type = PacketType::PingReq as u8;
-                let flags = 0x00;
-                let first_byte = (packet_type << 4) | flags;
-                buf.put_u8(first_byte);
-                // 剩余长度为0
-                buf.put_u8(0x00);
-            },
-            MqttPacket::PingResp => {
-                // PINGRESP数据包只包含固定头
-                let packet_type = PacketType::PingResp as u8;
-                let flags = 0x00;
-                let first_byte = (packet_type << 4) | flags;
-                buf.put_u8(first_byte);
-                // 剩余长度为0
-                buf.put_u8(0x00);
-            },
-            MqttPacket::Disconnect => {
-                // DISCONNECT数据包只包含固定头
-                let packet_type = PacketType::Disconnect as u8;
-                let flags = 0x00;
-                let first_byte = (packet_type << 4) | flags;
-                buf.put_u8(first_byte);
-                // 剩余长度为0
-                buf.put_u8(0x00);
-            },
+            MqttPacket::PingReq(packet) => packet.write(buf),
+            MqttPacket::PingResp(packet) => packet.write(buf),
+            MqttPacket::Disconnect(packet) => packet.write(buf),
         }
     }
+    
+    /// 从BytesMut解析MQTT数据包
+  pub fn read(buffer: &mut BytesMut) -> Result<MqttPacket, String> {
+    // 将输入转换为BytesMut
+    // let mut buffer = BytesMut::from(input);
+    
+    // 解析固定头
+    let fixed_header = FixedHeader::parse(buffer)?;
+    
+    // 检查剩余数据长度是否足够
+    if buffer.len() < fixed_header.remaining_length {
+        return Err("Insufficient data for remaining length".to_string());
+    }
+    
+    // 提取剩余的数据部分
+    let mut remaining_data = buffer.split_to(fixed_header.remaining_length);
+    
+    // 根据数据包类型解析剩余部分
+    let packet = match fixed_header.packet_type {
+        PacketType::Connect => {
+            let connect_packet = connect::ConnectPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::Connect(connect_packet))
+        },
+        PacketType::ConnAck => {
+            let connack_packet = connack::ConnAckPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::ConnAck(connack_packet))
+        },
+        PacketType::Publish => {
+            let publish_packet = publish::PublishPacket::parse(&mut remaining_data, Some(fixed_header.flags))?;
+            Ok(MqttPacket::Publish(publish_packet))
+        },
+        PacketType::PubAck => {
+            let puback_packet = puback::PubAckPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PubAck(puback_packet))
+        },
+        PacketType::PubRec => {
+            let pubrec_packet = pubrec::PubRecPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PubRec(pubrec_packet))
+        },
+        PacketType::PubRel => {
+            let pubrel_packet = pubrel::PubRelPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PubRel(pubrel_packet))
+        },
+        PacketType::PubComp => {
+            let pubcomp_packet = pubcomp::PubCompPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PubComp(pubcomp_packet))
+        },
+        PacketType::Subscribe => {
+            let subscribe_packet = subscribe::SubscribePacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::Subscribe(subscribe_packet))
+        },
+        PacketType::SubAck => {
+            let suback_packet = suback::SubAckPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::SubAck(suback_packet))
+        },
+        PacketType::Unsubscribe => {
+            let unsubscribe_packet = unsubscribe::UnsubscribePacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::Unsubscribe(unsubscribe_packet))
+        },
+        PacketType::UnsubAck => {
+            let unsuback_packet = unsuback::UnsubAckPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::UnsubAck(unsuback_packet))
+        },
+        PacketType::PingReq => {
+            let pingreq_packet = pingreq::PingReqPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PingReq(pingreq_packet))
+        },
+        PacketType::PingResp => {
+            let pingresp_packet = pingresp::PingRespPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::PingResp(pingresp_packet))
+        },
+        PacketType::Disconnect => {
+            let disconnect_packet = disconnect::DisconnectPacket::parse(&mut remaining_data, None)?;
+            Ok(MqttPacket::Disconnect(disconnect_packet))
+        },
+    };
+    buffer.clear();
+    packet
+}
+
 }
 
 /// MQTT固定头结构
@@ -242,9 +345,9 @@ pub enum MqttPacket {
     SubAck(suback::SubAckPacket),
     Unsubscribe(unsubscribe::UnsubscribePacket),
     UnsubAck(unsuback::UnsubAckPacket),
-    PingReq,
-    PingResp,
-    Disconnect,
+    PingReq(pingreq::PingReqPacket),
+    PingResp(pingresp::PingRespPacket),
+    Disconnect(disconnect::DisconnectPacket),
 }
 
 
@@ -259,77 +362,7 @@ pub use subscribe::*;
 pub use suback::*;
 pub use unsubscribe::*;
 pub use unsuback::*;
+pub use pingreq::*;
+pub use pingresp::*;
+pub use disconnect::*;
 
-/// 解析MQTT数据包
-pub fn parse_mqtt_packet(input: &[u8]) -> Result<MqttPacket, String> {
-    // 将输入转换为BytesMut
-    let mut buffer = BytesMut::from(input);
-    
-    // 解析固定头
-    let fixed_header = FixedHeader::parse(&mut buffer)?;
-    
-    // 检查剩余数据长度是否足够
-    if buffer.len() < fixed_header.remaining_length {
-        return Err("Insufficient data for remaining length".to_string());
-    }
-    
-    // 提取剩余的数据部分
-    let mut remaining_data = buffer.split_to(fixed_header.remaining_length);
-    
-    // 根据数据包类型解析剩余部分
-    match fixed_header.packet_type {
-        PacketType::Connect => {
-            let connect_packet = connect::parse_connect(&mut remaining_data)?;
-            Ok(MqttPacket::Connect(connect_packet))
-        },
-        PacketType::ConnAck => {
-            let connack_packet = connack::parse_connack(&mut remaining_data)?;
-            Ok(MqttPacket::ConnAck(connack_packet))
-        },
-        PacketType::Publish => {
-            let publish_packet = publish::parse_publish(&mut remaining_data, fixed_header.flags)?;
-            Ok(MqttPacket::Publish(publish_packet))
-        },
-        PacketType::PubAck => {
-            let puback_packet = puback::parse_puback(&mut remaining_data)?;
-            Ok(MqttPacket::PubAck(puback_packet))
-        },
-        PacketType::PubRec => {
-            let pubrec_packet = pubrec::parse_pubrec(&mut remaining_data)?;
-            Ok(MqttPacket::PubRec(pubrec_packet))
-        },
-        PacketType::PubRel => {
-            let pubrel_packet = pubrel::parse_pubrel(&mut remaining_data)?;
-            Ok(MqttPacket::PubRel(pubrel_packet))
-        },
-        PacketType::PubComp => {
-            let pubcomp_packet = pubcomp::parse_pubcomp(&mut remaining_data)?;
-            Ok(MqttPacket::PubComp(pubcomp_packet))
-        },
-        PacketType::Subscribe => {
-            let subscribe_packet = subscribe::parse_subscribe(&mut remaining_data)?;
-            Ok(MqttPacket::Subscribe(subscribe_packet))
-        },
-        PacketType::SubAck => {
-            let suback_packet = suback::parse_suback(&mut remaining_data)?;
-            Ok(MqttPacket::SubAck(suback_packet))
-        },
-        PacketType::Unsubscribe => {
-            let unsubscribe_packet = unsubscribe::parse_unsubscribe(&mut remaining_data)?;
-            Ok(MqttPacket::Unsubscribe(unsubscribe_packet))
-        },
-        PacketType::UnsubAck => {
-            let unsuback_packet = unsuback::parse_unsuback(&mut remaining_data)?;
-            Ok(MqttPacket::UnsubAck(unsuback_packet))
-        },
-        PacketType::PingReq => {
-            Ok(MqttPacket::PingReq)
-        },
-        PacketType::PingResp => {
-            Ok(MqttPacket::PingResp)
-        },
-        PacketType::Disconnect => {
-            Ok(MqttPacket::Disconnect)
-        },
-    }
-}

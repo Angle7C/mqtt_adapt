@@ -1,3 +1,4 @@
+use super::Packet;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
 
@@ -10,28 +11,12 @@ pub struct SubAckPacket {
 
 /// 解析SUBACK数据包
 pub fn parse_suback(input: &mut BytesMut) -> Result<SubAckPacket, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for SUBACK packet".to_string());
-    }
-    
-    let packet_id = input.get_u16();
-    
-    let mut return_codes = Vec::new();
-    
-    while !input.is_empty() {
-        let code = input.get_u8();
-        return_codes.push(code);
-    }
-    
-    Ok(SubAckPacket {
-        packet_id,
-        return_codes,
-    })
+    SubAckPacket::parse(input, None)
 }
 
-impl SubAckPacket {
+impl Packet for SubAckPacket {
     /// 将SUBACK数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
         let variable_header_length = 2; // 数据包ID
         let payload_length = self.return_codes.len(); // 返回码数量
@@ -55,5 +40,26 @@ impl SubAckPacket {
         for code in &self.return_codes {
             buf.put_u8(*code);
         }
+    }
+    
+    /// 从BytesMut解析SUBACK数据包
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+        if input.len() < 2 {
+            return Err("Insufficient data for SUBACK packet".to_string());
+        }
+        
+        let packet_id = input.get_u16();
+        
+        let mut return_codes = Vec::new();
+        
+        while !input.is_empty() {
+            let code = input.get_u8();
+            return_codes.push(code);
+        }
+        
+        Ok(SubAckPacket {
+            packet_id,
+            return_codes,
+        })
     }
 }

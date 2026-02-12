@@ -1,3 +1,5 @@
+use super::Packet;
+use super::parse_mqtt_string;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -13,22 +15,7 @@ pub struct PublishPacket {
     pub payload: Bytes,
 }
 
-/// 解析MQTT字符串
-fn parse_mqtt_string(input: &mut BytesMut) -> Result<String, String> {
-    if input.len() < 2 {
-        return Err("Insufficient data for MQTT string length".to_string());
-    }
-    
-    let length = input.get_u16() as usize;
-    
-    if input.len() < length {
-        return Err("Insufficient data for MQTT string content".to_string());
-    }
-    
-    let bytes = input.split_to(length);
-    let string = String::from_utf8_lossy(&bytes).to_string();
-    Ok(string)
-}
+
 
 /// 解析PUBLISH数据包
 pub fn parse_publish(input: &mut BytesMut, flags: u8) -> Result<PublishPacket, String> {
@@ -62,9 +49,9 @@ pub fn parse_publish(input: &mut BytesMut, flags: u8) -> Result<PublishPacket, S
     })
 }
 
-impl PublishPacket {
+impl Packet for PublishPacket {
     /// 将PUBLISH数据包序列化为字节并写入缓冲区
-    pub fn write(&self, buf: &mut BytesMut) {
+    fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
         let mut variable_header_length = 0;
         
@@ -113,5 +100,12 @@ impl PublishPacket {
         
         // 写入载荷
         buf.put_slice(&self.payload);
+    }
+    
+    /// 从BytesMut解析PUBLISH数据包
+    /// 注意：此方法使用默认的flags值，实际使用中应使用parse_publish函数
+    fn parse(input: &mut BytesMut, flags: Option<u8>) -> Result<Self, String> {
+        // 使用传入的flags值或默认值（无dup，QoS 0，无retain）
+        parse_publish(input, flags.unwrap_or(0x00))
     }
 }
