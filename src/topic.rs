@@ -73,7 +73,7 @@ impl TopicManager {
     /// 添加订阅
     pub async fn add_subscription(&self, topic_filter: &str, client_id: String, qos: u8) {
         let mut root = self.root.write().await;
-        let parts: Vec<&str> = topic_filter.split('.').collect();
+        let parts: Vec<&str> = topic_filter.split('/').collect();
 
         let mut current_node = &mut *root;
         for (i, part) in parts.iter().enumerate() {
@@ -110,7 +110,7 @@ impl TopicManager {
     /// 添加主题
     pub async fn add_topic(&self, topic_filter: &str) {
         let mut root = self.root.write().await;
-        let parts: Vec<&str> = topic_filter.split('.').collect();
+        let parts: Vec<&str> = topic_filter.split('/').collect();
 
         let mut current_node = &mut *root;
         for part in parts {
@@ -131,7 +131,7 @@ impl TopicManager {
     /// 移除订阅
     pub async fn remove_subscription(&self, topic_filter: &str, client_id: &str) {
         let mut root = self.root.write().await;
-        let parts: Vec<&str> = topic_filter.split('.').collect();
+        let parts: Vec<&str> = topic_filter.split('/').collect();
 
         // 第一步：移除订阅者
         {
@@ -174,7 +174,7 @@ impl TopicManager {
         let root_guard = self.root.read().await;
         let root = &*root_guard;
         let mut subscribers = Vec::new();
-        let parts: Vec<&str> = topic.split('.').collect();
+        let parts: Vec<&str> = topic.split('/').collect();
 
         // 使用队列来模拟递归调用
         let mut queue = Vec::new();

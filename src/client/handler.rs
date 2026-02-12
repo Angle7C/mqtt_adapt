@@ -1,59 +1,78 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use flume::RecvError;
-use log::{info, error};
+use log::{error, info};
 use tokio::time::Duration;
 
 use crate::client::client::Client;
-use crate::protocol::{DisconnectPacket, Packet};
+use crate::protocol::{DisconnectPacket, MqttPacket, Packet};
 use crate::routing::event::Event;
 
 impl Client {
     /// 处理客户端连接
     pub async fn handle(mut self) -> Result<()> {
+        let time = (self.keepalive as f32 * 1.5) as u64;
+        info!("keepalive: {}", time);
+
+        let timeout_duration = Duration::from_secs(time);
+        let rx = self.event_receiver.clone();
         loop {
             // 计算超时时间：keepalive的1.5倍
-            let timeout_duration = Duration::from_secs((self.keepalive as f32 * 1.5) as u64);
-            let rx = self.rx.clone();
-            
+
             tokio::select! {
                 // 1. 读取来自TCP连接的消息
                 read_result = self.read() => {
-                    info!("read buffer");
                     self.handle_read_result(read_result).await?;
                 },
 
                 // 2. 接收来自消息路由的消息
-                event_result = rx.recv_async() => {
-                    info!("Received event from router: {:?}", event_result);
+                event_result =rx.recv_async() => {
                     self.handle_event_result(event_result).await?;
                 },
 
                 // 3. 超时处理
                 _ = tokio::time::sleep(timeout_duration) => {
                     info!("Timeout after {} seconds", timeout_duration.as_secs());
-                    self.handle_timeout(timeout_duration).await?;
-                    break;
+                    self.close().await?;
                 },
+            }
+
+            if self.state == super::client::ClientState::Disconnected {
+                drop(self);
+                break;
             }
         }
 
         Ok(())
     }
-    
+
     /// 处理读取结果
     async fn handle_read_result(&mut self, result: Result<usize>) -> Result<()> {
         match result {
-            Ok(n) => {
-                if n == 0 {
-                    // 连接关闭
-                    self.state = super::client::ClientState::Disconnected;
-                    return Err(anyhow::anyhow!("Connection closed by client"));
-                }
+            Ok(n) if n <= 0 => {
+                self.close().await?;
+                return Ok(());
+            }
+            Ok(_) => {
+                // 处理读取到的数据
+                let packet = MqttPacket::read(&mut self.read_buf)?;
 
-                // 这里可以添加消息解析逻辑
-                // 暂时简单处理
-                info!("Received {} bytes from client", n);
+                // 对于某些只是用来保持连接的包，直接处理而不发送到路由
+                match &packet {
+                    MqttPacket::PingReq(_) => {
+                        // 直接回复PingResp
+                        self.handle_ping_req().await?;
+                    }
+                    MqttPacket::Disconnect(_) => {
+                        // 直接关闭连接
+                        self.close().await?;
+                    }
+                    _ => {
+                        // 其他包发送到路由中
+                        let event = Event::MessageReceived(self.client_id.clone(), packet);
+                        self.send_event(event)?;
+                    }
+                }
             }
             Err(e) => {
                 error!("Error reading from client: {:?}", e);
@@ -63,7 +82,7 @@ impl Client {
         }
         Ok(())
     }
-    
+
     /// 处理事件结果
     async fn handle_event_result(&mut self, result: Result<Event, RecvError>) -> Result<()> {
         match result {
@@ -79,49 +98,54 @@ impl Client {
         }
         Ok(())
     }
-    
+
     /// 处理超时
-    async fn handle_timeout(&mut self, timeout_duration: Duration) -> Result<()> {
-        // 超时处理
-        info!("Client timeout: no activity for {} seconds", timeout_duration.as_secs());
-        
+    async fn close(&mut self) -> Result<()> {
         // 发送断开连接数据包
         self.send_disconnect_packet().await?;
-        
+
         // 通知客户端断开连接
         self.notify_disconnection().await?;
-        
+
         // 更新客户端状态
         self.state = super::client::ClientState::Disconnected;
-        
+
         Ok(())
     }
-    
+
     /// 发送断开连接数据包
     async fn send_disconnect_packet(&mut self) -> Result<()> {
         // 创建Disconnect数据包
         let disconnect_packet = DisconnectPacket;
-        
         // 写入到缓冲区
-        let mut buf = BytesMut::new();
-        disconnect_packet.write(&mut buf);
-        self.write_buf.extend_from_slice(&buf);
-        
+        disconnect_packet.write(&mut self.write_buf);
         // 发送数据包
         self.write().await?;
-        
+
         Ok(())
     }
-    
+
+    /// 处理PingReq数据包
+    async fn handle_ping_req(&mut self) -> Result<()> {
+        // 创建PingResp数据包
+        use crate::protocol::PingRespPacket;
+
+        // 写入到缓冲区
+        PingRespPacket.write(&mut self.write_buf);
+
+        // 发送数据包
+        self.write().await?;
+
+        Ok(())
+    }
+
     /// 通知客户端断开连接
     async fn notify_disconnection(&mut self) -> Result<()> {
-        if let Some(client_id) = &self.client_id {
-            let event = Event::ClientDisconnected(client_id.clone());
-            self.send_event(event)?;
-        }
-        Ok(())
+        let event = Event::ClientDisconnected(self.client_id.clone());
+        self.send_event(event)
+        // Ok(())
     }
-    
+
     /// 处理来自router的事件
     pub async fn handle_router_event(&mut self, event: Event) -> Result<()> {
         use crate::protocol::Packet;

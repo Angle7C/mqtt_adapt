@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use super::Packet;
-
+use anyhow::Result;
 /// DISCONNECT数据包
 /// MQTT DISCONNECT数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +19,7 @@ impl Packet for DisconnectPacket {
     }
     
     /// 从BytesMut解析DISCONNECT数据包
-    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         // DISCONNECT数据包没有可变头部和负载
         Ok(DisconnectPacket)
     }

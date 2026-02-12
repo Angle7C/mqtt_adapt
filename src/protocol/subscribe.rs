@@ -3,7 +3,7 @@ use super::parse_mqtt_string;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
-
+use anyhow::Result;
 /// SUBSCRIBE数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscribePacket {
@@ -50,9 +50,9 @@ impl Packet for SubscribePacket {
     }
     
     /// 从BytesMut解析SUBSCRIBE数据包
-    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         if input.len() < 2 {
-            return Err("Insufficient data for SUBSCRIBE packet".to_string());
+            return Err(anyhow::format_err!("Insufficient data for SUBSCRIBE packet"));  
         }
         
         let packet_id = input.get_u16();
@@ -63,7 +63,7 @@ impl Packet for SubscribePacket {
             let topic = parse_mqtt_string(input)?;
             
             if input.is_empty() {
-                return Err("Insufficient data for QoS level".to_string());
+                return Err(anyhow::format_err!("Insufficient data for QoS level")); 
             }
             
             let qos = input.get_u8();

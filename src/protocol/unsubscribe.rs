@@ -3,7 +3,7 @@ use super::parse_mqtt_string;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
-
+use anyhow::Result;
 /// UNSUBSCRIBE数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubscribePacket {
@@ -18,7 +18,7 @@ impl Packet for UnsubscribePacket {
     /// 将UNSUBSCRIBE数据包序列化为字节并写入缓冲区
     fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
-        let mut variable_header_length = 2; // 数据包ID
+        let variable_header_length = 2; // 数据包ID
         let mut payload_length = 0;
         
         // 计算每个主题的长度
@@ -48,9 +48,9 @@ impl Packet for UnsubscribePacket {
     }
     
     /// 从BytesMut解析UNSUBSCRIBE数据包
-    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         if input.len() < 2 {
-            return Err("Insufficient data for UNSUBSCRIBE packet".to_string());
+            return Err(anyhow::format_err!("Insufficient data for UNSUBSCRIBE packet"));
         }
         
         let packet_id = input.get_u16();

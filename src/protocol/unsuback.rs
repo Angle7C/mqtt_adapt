@@ -1,7 +1,7 @@
 use super::Packet;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
-
+use anyhow::Result;
 /// UNSUBACK数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnsubAckPacket {
@@ -29,9 +29,9 @@ impl Packet for UnsubAckPacket {
     }
     
     /// 从BytesMut解析UNSUBACK数据包
-    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         if input.len() < 2 {
-            return Err("Insufficient data for UNSUBACK packet".to_string());
+            return Err(anyhow::format_err!("Insufficient data for UNSUBACK packet"));   
         }
         
         let packet_id = input.get_u16();
