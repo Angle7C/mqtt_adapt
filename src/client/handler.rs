@@ -11,10 +11,13 @@ use crate::routing::event::Event;
 impl Client {
     /// 处理客户端连接
     pub async fn handle(mut self) -> Result<()> {
+        let keepalive = if self.keepalive == 0 { 60 } else { self.keepalive };
+            let timeout_duration = Duration::from_secs((keepalive as f32 * 1.5) as u64);
+            let rx = self.rx.clone();
         loop {
             // 计算超时时间：keepalive的1.5倍
-            let timeout_duration = Duration::from_secs((self.keepalive as f32 * 1.5) as u64);
-            let rx = self.rx.clone();
+            // 如果keepalive为0，则使用默认值60秒
+            
             
             tokio::select! {
                 // 1. 读取来自TCP连接的消息
@@ -46,14 +49,37 @@ impl Client {
         match result {
             Ok(n) => {
                 if n == 0 {
+                    error!("Connection closed by client");
                     // 连接关闭
                     self.state = super::client::ClientState::Disconnected;
                     return Err(anyhow::anyhow!("Connection closed by client"));
                 }
 
-                // 这里可以添加消息解析逻辑
-                // 暂时简单处理
-                info!("Received {} bytes from client", n);
+                // 解析MQTT数据包
+                match crate::protocol::MqttPacket::read(&mut self.read_buf) {
+                    Ok(packet) => {
+                        info!("Received packet: {:?}", packet);
+                        
+                        // 处理不同类型的数据包
+                        match packet {
+                            crate::protocol::MqttPacket::Disconnect(_) => {
+                                // 客户端发送了DISCONNECT消息，关闭连接
+                                info!("Client sent DISCONNECT packet");
+                                self.handle_disconnect().await?;
+                                return Err(anyhow::anyhow!("Client requested disconnection"));
+                            }
+                            _ => {
+                                // 处理其他类型的数据包
+                                // 这里可以添加相应的处理逻辑
+                                info!("Received other packet type: {:?}", packet);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to parse MQTT packet: {}", e);
+                        // 解析错误，继续等待更多数据
+                    }
+                }
             }
             Err(e) => {
                 error!("Error reading from client: {:?}", e);
@@ -61,6 +87,17 @@ impl Client {
                 return Err(e.into());
             }
         }
+        Ok(())
+    }
+    
+    /// 处理客户端发送的DISCONNECT消息
+    async fn handle_disconnect(&mut self) -> Result<()> {
+        // 通知客户端断开连接
+        self.notify_disconnection().await?;
+        
+        // 更新客户端状态
+        self.state = super::client::ClientState::Disconnected;
+        
         Ok(())
     }
     
