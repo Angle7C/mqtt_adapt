@@ -34,12 +34,11 @@ impl Server {
                 router_clone.start().await;
             });
         });
-
         // 绑定TCP监听器
         let listener = TcpListener::bind(&self.addr)
             .await
             .expect("Failed to bind address");
-
+    
         info!("MQTT server started on {}", self.addr);
 
         // 处理客户端连接

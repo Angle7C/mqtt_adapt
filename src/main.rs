@@ -1,6 +1,9 @@
 use mqtt_adapt::server::Server;
 use tracing::Level;
+use mimalloc::MiMalloc;
 
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 fn main() {
     // 初始化tracing日志系统

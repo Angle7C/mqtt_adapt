@@ -19,7 +19,7 @@ async fn test_client_registration() {
     let (tx, _rx) = unbounded();
     
     // 注册客户端
-    let result = router.register_client(&client_id.clone(), tx).await;
+    let result = router.register_client(&client_id, tx).await;
     assert!(result.is_ok());
     
     // 移除客户端
@@ -33,7 +33,7 @@ async fn test_client_connected_event() {
     let (tx, rx) = unbounded();
     
     // 注册客户端
-    router.register_client(&client_id.clone(), tx).await.unwrap();
+    router.register_client(&client_id, tx).await.unwrap();
     
     // 发送客户端连接事件
     let event = Event::ClientConnected(client_id.clone());
@@ -62,7 +62,7 @@ async fn test_subscribe_event() {
     let (tx, rx) = unbounded();
     
     // 注册客户端
-    router.register_client(&client_id.clone(), tx).await.unwrap();
+    router.register_client(&client_id, tx).await.unwrap();
     
     // 创建订阅数据包
     let topics = vec![("test/topic".to_string(), 0)];
@@ -98,7 +98,8 @@ async fn test_unsubscribe_event() {
     let (tx, rx) = unbounded();
     
     // 注册客户端
-    router.register_client(&client_id.clone(), tx).await.unwrap();
+    router.register_client(&client_id, tx).await.unwrap();
+
     
     // 创建取消订阅数据包
     let topics = vec!["test/topic".to_string()];
@@ -134,12 +135,12 @@ async fn test_publish_event() {
     // 注册发布者客户端
     let publisher_id = "publisher".to_string();
     let (publisher_tx, _publisher_rx) = unbounded();
-    router.register_client(&publisher_id.clone(), publisher_tx).await.unwrap();
+    router.register_client(&publisher_id, publisher_tx).await.unwrap();
     
     // 注册订阅者客户端
     let subscriber_id = "subscriber".to_string();
     let (subscriber_tx, subscriber_rx) = unbounded();
-    router.register_client(&subscriber_id.clone(), subscriber_tx).await.unwrap();
+    router.register_client(&subscriber_id, subscriber_tx).await.unwrap();
     
     // 首先让订阅者订阅主题
     let subscribe_topics = vec![("test/topic".to_string(), 0)];
@@ -190,7 +191,7 @@ async fn test_client_disconnected_event() {
     let (tx, _rx) = unbounded();
     
     // 注册客户端
-    router.register_client(&client_id.clone(), tx).await.unwrap();
+    router.register_client(&client_id, tx).await.unwrap();
     
     // 发送客户端断开连接事件
     let event = Event::ClientDisconnected(client_id.clone());
@@ -200,6 +201,6 @@ async fn test_client_disconnected_event() {
     // 由于remove_client是内部方法，我们无法直接验证
     // 但可以通过尝试发送消息来间接验证
     let (new_tx, _new_rx) = unbounded();
-    let result = router.register_client(&client_id.clone(), new_tx).await;
+    let result = router.register_client(&client_id, new_tx).await;
     assert!(result.is_ok());
 }

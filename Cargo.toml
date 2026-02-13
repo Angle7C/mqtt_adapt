@@ -16,7 +16,7 @@ anyhow = "1.0"
 flume = "0.11"
 libc = "0.2.181"
 num_cpus = "1.17.0"
-
+mimalloc = { version = "0.1", features = ["override"] }
 
 [dev-dependencies]
 criterion = "0.5"
