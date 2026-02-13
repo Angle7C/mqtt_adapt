@@ -1,9 +1,6 @@
-use std::hash::RandomState;
 
 use anyhow::Result;
-use bytes::BytesMut;
 use flume::unbounded;
-use log::{error, info};
 use tokio::net::TcpStream;
 
 use crate::client::client::Client;
@@ -40,7 +37,7 @@ pub async fn create_client_with_connect(
 
     if let MqttPacket::Connect(connect_packet) = packet {
         // 克隆客户端ID
-        let client_id = connect_packet.client_id.clone();
+        let client_id = connect_packet.client_id;
 
         // 设置客户端ID
         client.set_client_id(client_id.clone());
@@ -60,7 +57,7 @@ pub async fn create_client_with_connect(
 
         // 注册客户端到路由器
         router
-            .register_client(client_id.clone(), tx.clone())
+            .register_client(&client_id, tx.clone())
             .await?;
     } else {
         return Err(anyhow::format_err!("Expected CONNECT packet"));

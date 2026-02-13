@@ -1,4 +1,4 @@
-use crate::{ClinetId, protocol::{MqttPacket, Packet}};
+use crate::{ClinetId, protocol::MqttPacket};
 
 #[derive(Debug)]
 pub enum Event {

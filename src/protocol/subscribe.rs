@@ -18,7 +18,7 @@ impl Packet for SubscribePacket {
     /// 将SUBSCRIBE数据包序列化为字节并写入缓冲区
     fn write(&self, buf: &mut BytesMut) {
         // 计算可变头和载荷长度
-        let mut variable_header_length = 2; // 数据包ID
+        let variable_header_length = 2; // 数据包ID
         let mut payload_length = 0;
         
         // 计算每个主题和QoS的长度

@@ -1,5 +1,4 @@
 use anyhow::Result;
-use log::info;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::client::client::Client;

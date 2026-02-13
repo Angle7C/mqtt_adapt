@@ -1,11 +1,10 @@
 use anyhow::Result;
-use bytes::BytesMut;
 use flume::RecvError;
 use log::{error, info};
 use tokio::time::Duration;
 
 use crate::client::client::Client;
-use crate::protocol::{DisconnectPacket, MqttPacket, Packet};
+use crate::protocol::{MqttPacket, Packet};
 use crate::routing::event::Event;
 
 impl Client {
@@ -111,18 +110,6 @@ impl Client {
         Ok(())
     }
 
-    /// 发送断开连接数据包
-    async fn send_disconnect_packet(&mut self) -> Result<()> {
-        // 创建Disconnect数据包
-        let disconnect_packet = DisconnectPacket;
-        // 写入到缓冲区
-        disconnect_packet.write(&mut self.write_buf);
-        // 发送数据包
-        self.write().await?;
-
-        Ok(())
-    }
-
     /// 处理PingReq数据包
     async fn handle_ping_req(&mut self) -> Result<()> {
         // 创建PingResp数据包
@@ -201,12 +188,12 @@ impl Client {
                 self.write().await?;
             }
             Event::ClientConnected(client_id) => {
-                info!("Client connected: {}", client_id);
+                info!("Client connected: {} from {}", client_id, self.addr);
             }
             Event::ClientDisconnected(client_id) => {
                 info!("Client disconnected: {}", client_id);
             }
-            Event::MessageReceived(client_id, packet) => {
+            Event::MessageReceived(_client_id, _packet) => {
                 // info!("Message received from {}: {:?}", client_id, packet);
             }
             Event::BroadcastMessage(packet) => {

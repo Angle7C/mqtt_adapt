@@ -1,9 +1,7 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use flume::{Receiver, Sender};
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpStream;
-use tokio::time::Duration;
+use tokio::{io::BufReader, net::TcpStream};
 
 use crate::routing::event::Event;
 
@@ -20,7 +18,7 @@ pub enum ClientState {
 #[derive(Debug)]
 pub struct Client {
     /// 底层TCP连接
-    pub(super) socket: Box<TcpStream>,
+    pub(super) socket: BufReader<TcpStream>,
     /// 连接状态
     pub(super) state: ClientState,
     /// 客户端ID
@@ -43,7 +41,7 @@ impl Client {
     /// 创建新的客户端
     pub fn new(socket: TcpStream, addr: std::net::SocketAddr, rx: Receiver<Event>, tx: Sender<Event>, client_id: String) -> Self {
         Self {
-            socket: Box::new(socket),
+            socket: BufReader::new(socket),
             state: ClientState::Connected,
             addr,
             client_id,

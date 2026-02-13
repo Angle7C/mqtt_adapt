@@ -1,12 +1,10 @@
 use mqtt_adapt::server::Server;
-use std::net::SocketAddr;
-use tokio::runtime::Runtime;
 use tracing::Level;
-use tracing_subscriber::prelude::*;
+
 
 fn main() {
     // 初始化tracing日志系统
-    let num_cpus = num_cpus::get();
+    let _num_cpus = num_cpus::get();
     init_tracing();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
