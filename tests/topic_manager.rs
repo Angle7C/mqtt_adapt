@@ -2,13 +2,13 @@ use mqtt_adapt::topic::TopicManager;
 
 #[tokio::test]
 async fn test_topic_manager() {
-    let topic_manager = TopicManager::new();
+    let mut topic_manager = TopicManager::new();
     
     // Test 1: Add subscriptions
     for i in 0..10 {
         let client_id = format!("client_{}", i);
         let topic = format!("sensor.{}.data", i % 5);
-        topic_manager.add_subscription(&topic, client_id, 1).await;
+        topic_manager.add_subscription(client_id, topic, 1).await;
     }
     
     // Test 2: Find subscribers
@@ -22,7 +22,7 @@ async fn test_topic_manager() {
     for i in 0..10 {
         let client_id = format!("client_{}", i);
         let topic = format!("sensor.{}.data", i % 5);
-        topic_manager.remove_subscription(&topic, &client_id).await;
+        topic_manager.remove_subscription(client_id, topic).await;
     }
     
     // Test 4: Verify all subscriptions are removed
