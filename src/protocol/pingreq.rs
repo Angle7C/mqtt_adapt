@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use super::Packet;
-
+use anyhow::Result;
 /// PINGREQ数据包
 /// MQTT PINGREQ数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +19,7 @@ impl Packet for PingReqPacket {
     }
     
     /// 从BytesMut解析PINGREQ数据包
-    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         // PINGREQ数据包没有可变头部和负载
         Ok(PingReqPacket)
     }

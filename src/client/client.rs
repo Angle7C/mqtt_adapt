@@ -1,6 +1,7 @@
 use anyhow::Result;
 use bytes::BytesMut;
 use flume::{Receiver, Sender};
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 use tokio::time::Duration;
 
@@ -23,7 +24,7 @@ pub struct Client {
     /// 连接状态
     pub(super) state: ClientState,
     /// 客户端ID
-    pub(super) client_id: Option<String>,
+    pub(super) client_id: String,
     /// 保活时间（秒）
     pub(super) keepalive: u16,
     /// 读取缓冲区
@@ -31,23 +32,23 @@ pub struct Client {
     /// 写入缓冲区
     pub(super) write_buf: BytesMut,
     /// 消息接收通道
-    pub(super) rx: Receiver<Event>,
+    pub(super) event_receiver: Receiver<Event>,
     /// 消息发送通道（用于向路由器发送事件）
-    pub(super) tx: Sender<Event>,
+    pub(super) router_send: Sender<Event>,
 }
 
 impl Client {
     /// 创建新的客户端
-    pub fn new(socket: TcpStream, rx: Receiver<Event>, tx: Sender<Event>) -> Self {
+    pub fn new(socket: TcpStream, rx: Receiver<Event>, tx: Sender<Event>, client_id: String) -> Self {
         Self {
             socket: Box::new(socket),
             state: ClientState::Connected,
-            client_id: None,
+            client_id,
             keepalive: 60, // 默认保活时间为60秒
             read_buf: BytesMut::with_capacity(1024 * 10),
             write_buf: BytesMut::with_capacity(1024 * 10),
-            rx,
-            tx,
+            event_receiver:rx,
+            router_send: tx,
         }
     }
 
@@ -55,18 +56,18 @@ impl Client {
 
     /// 发送事件到路由器
     pub fn send_event(&self, event: Event) -> Result<()> {
-        self.tx.send(event)?;
+        self.router_send.send(event)?;
         Ok(())
     }
 
     /// 设置客户端ID
     pub fn set_client_id(&mut self, client_id: String) {
-        self.client_id = Some(client_id);
+        self.client_id = client_id;
     }
 
     /// 获取客户端ID
-    pub fn client_id(&self) -> Option<&String> {
-        self.client_id.as_ref()
+    pub fn client_id(&self) -> &str {
+        &self.client_id
     }
 
     /// 获取客户端状态

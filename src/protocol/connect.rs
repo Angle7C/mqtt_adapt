@@ -5,7 +5,7 @@ use super::write_mqtt_bytes;
 use super::write_mqtt_string;
 use super::write_remaining_length;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-
+use anyhow::Result;
 /// CONNECT数据包
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectPacket {
@@ -108,25 +108,25 @@ impl Packet for ConnectPacket {
     }
     
     /// 从BytesMut解析CONNECT数据包
-    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         // 解析协议名称
         let protocol_name = parse_mqtt_string(input)?;
         
         // 解析协议级别
         if input.is_empty() {
-            return Err("Insufficient data for protocol level".to_string());
+            return Err(anyhow::format_err!("Insufficient data for protocol level"));
         }
         let protocol_level = input.get_u8();
         
         // 解析连接标志
         if input.is_empty() {
-            return Err("Insufficient data for connect flags".to_string());
+            return Err(anyhow::format_err!("Insufficient data for connect flags"));
         }
         let connect_flags = input.get_u8();
         
         // 解析保活时间
         if input.len() < 2 {
-            return Err("Insufficient data for keep alive".to_string());
+            return Err(anyhow::format_err!("Insufficient data for keep alive"));
         }
         let keep_alive = input.get_u16();
         

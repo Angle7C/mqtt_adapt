@@ -1,5 +1,5 @@
 use bytes::{BufMut, BytesMut};
-use super::Packet;
+use super::Packet;use anyhow::Result;
 
 /// PINGRESP数据包
 /// MQTT PINGRESP数据包
@@ -19,7 +19,7 @@ impl Packet for PingRespPacket {
     }
     
     /// 从BytesMut解析PINGRESP数据包
-    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self, String> {
+    fn parse(_input: &mut BytesMut, _flags: Option<u8>) -> Result<Self> {
         // PINGRESP数据包没有可变头部和负载
         Ok(PingRespPacket)
     }
