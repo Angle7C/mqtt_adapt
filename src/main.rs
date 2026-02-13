@@ -1,21 +1,26 @@
 use mqtt_adapt::server::Server;
 use std::net::SocketAddr;
+use tokio::runtime::Runtime;
 use tracing::Level;
 use tracing_subscriber::prelude::*;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     // 初始化tracing日志系统
+    let num_cpus = num_cpus::get();
     init_tracing();
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        // 服务器地址
 
-    // 服务器地址
-    let addr: SocketAddr = "127.0.0.1:1883".parse().unwrap();
+        // 创建服务器
+        let server = Server::new("127.0.0.1:1883".parse().unwrap());
 
-    // 创建服务器
-    let server = Server::new(addr);
-
-    // 启动服务器
-    server.start().await;
+        // 启动服务器
+        server.start().await;
+    });
 }
 fn init_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

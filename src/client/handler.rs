@@ -15,7 +15,6 @@ impl Client {
         // 如果keepalive为0，则使用默认值60秒
         let keepalive = if self.keepalive == 0 { 60 } else { self.keepalive };
         let time = (keepalive as f32 * 1.5) as u64;
-        info!("keepalive: {}", time);
 
         let timeout_duration = Duration::from_secs(time);
         let rx = self.event_receiver.clone();
@@ -33,7 +32,6 @@ impl Client {
 
                 // 3. 超时处理
                 _ = tokio::time::sleep(timeout_duration) => {
-                    info!("Timeout after {} seconds", timeout_duration.as_secs());
                     self.close().await?;
                 },
             }
@@ -43,7 +41,6 @@ impl Client {
                 break;
             }
         }
-
         Ok(())
     }
 
@@ -87,7 +84,6 @@ impl Client {
     async fn handle_event_result(&mut self, result: Result<Event, RecvError>) -> Result<()> {
         match result {
             Ok(event) => {
-                info!("Received event from router: {:?}", event);
                 self.handle_router_event(event).await?;
             }
             Err(_) => {
@@ -101,8 +97,10 @@ impl Client {
 
     /// 处理超时
     async fn close(&mut self) -> Result<()> {
-        // 发送断开连接数据包
-        self.send_disconnect_packet().await?;
+        // if self.socket.writable().await.is_ok() {
+        //     // 发送断开连接数据包
+        //     self.send_disconnect_packet().await?;
+        // }
 
         // 通知客户端断开连接
         self.notify_disconnection().await?;
@@ -209,7 +207,7 @@ impl Client {
                 info!("Client disconnected: {}", client_id);
             }
             Event::MessageReceived(client_id, packet) => {
-                info!("Message received from {}: {:?}", client_id, packet);
+                // info!("Message received from {}: {:?}", client_id, packet);
             }
             Event::BroadcastMessage(packet) => {
                 info!("Broadcast message: {:?}", packet);

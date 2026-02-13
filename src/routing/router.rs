@@ -53,7 +53,6 @@ impl MessageRouter {
     pub async fn handle_event(&self, event: Event) {
         match event {
             Event::ClientConnected(client_id) => {
-                info!("Client connected: {}", client_id);
                 // 创建CONNACK数据包
                 let connack_packet = ConnAckPacket {
                     session_present: false, // 暂时设置为false
@@ -73,11 +72,9 @@ impl MessageRouter {
                 }
             }
             Event::ClientDisconnected(client_id) => {
-                info!("Client disconnected: {}", client_id);
                 self.remove_client(&client_id).await;
             }
             Event::MessageReceived(client_id, packet) => {
-                info!("Message received from {}: {:?}", client_id, packet);
                 // 处理不同类型的数据包
                 match packet {
                     MqttPacket::Subscribe(subscribe_packet) => {
@@ -99,19 +96,16 @@ impl MessageRouter {
                 }
             }
             Event::MessageSent(client_id, packet) => {
-                info!("Message sent to {}: {:?}", client_id, packet);
             }
             Event::BroadcastMessage(packet) => {
-                info!("Broadcast message: {:?}", packet);
                 // 这里应该添加广播逻辑
             }
         }
         // 由于 event 中的 packet 字段在 match 分支中已被部分移动，此处无法直接打印 event
-        info!("Event handled");
     }
 
     /// 启动路由器
-    pub async fn start(&self) {
+    pub async fn start(self) {
         while let Ok(event) = self.event_receiver.recv_async().await {
             self.handle_event(event).await;
         }
@@ -176,27 +170,29 @@ impl MessageRouter {
     }
     
     /// 处理发布消息
-    async fn handle_publish(&self, client_id: ClinetId, publish_packet: crate::protocol::PublishPacket) {
-        let topic = &publish_packet.topic_name;
-        let topic_manager = self.topic_manager.lock().await;
+    async fn handle_publish(&self, _client_id: ClinetId, publish_packet: crate::protocol::PublishPacket) {
+        let topic = publish_packet.topic_name.clone();
         
-        // 查找主题的所有订阅者
-        let subscribers = topic_manager.find_subscribers(topic).await;
-        info!("Subscribers for topic {}: {:?}", topic, subscribers);
-        // 为每个订阅者发送消息
+        let subscribers = {
+            let topic_manager = self.topic_manager.lock().await;
+            topic_manager.find_subscribers(&topic).await
+        };
+        
+        if subscribers.is_empty() {
+            return;
+        }
+        
         let senders = self.sender.lock().await;
         for subscriber in subscribers {
-              if let Some(tx) = senders.get(&subscriber.client_id) {
-                    // 构建Publish数据包，使用订阅者的QoS级别
-                    let mut pub_packet = publish_packet.clone();
-                    pub_packet.qos = subscriber.qos;
-                    
-                    let mqtt_packet = MqttPacket::Publish(pub_packet);
-                    let event = Event::MessageSent(subscriber.client_id.clone(), mqtt_packet);
-                    if let Err(e) = tx.try_send(event) {
-                        error!("Error sending PUBLISH to {}: {:?}", subscriber.client_id, e);
-                    }
+            if let Some(tx) = senders.get(&subscriber.client_id) {
+                let mut pub_packet = publish_packet.clone();
+                pub_packet.qos = subscriber.qos;
+                
+                let mqtt_packet = MqttPacket::Publish(pub_packet);
+                let event = Event::MessageSent(subscriber.client_id.clone(), mqtt_packet);
+                if let Err(e) = tx.try_send(event) {
                 }
+            }
         }
     }
     

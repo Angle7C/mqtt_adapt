@@ -19,6 +19,7 @@ use crate::routing::router::MessageRouter;
 /// 5. 发送客户端连接事件
 pub async fn create_client_with_connect(
     socket: TcpStream,
+    addr: std::net::SocketAddr,
     router: &MessageRouter,
 ) -> Result<Client> {
     // 创建客户端事件通道
@@ -26,7 +27,7 @@ pub async fn create_client_with_connect(
     //获取router的event_sender
     let router_event_sender = router.get_sender().clone();
     // 创建初始客户端实例
-    let mut client = Client::new(socket, rx, router_event_sender, "unknown".to_string());
+    let mut client = Client::new(socket,addr, rx, router_event_sender, "unknown".to_string());
 
     // 读取并解析CONNECT数据包
 

@@ -35,14 +35,17 @@ pub struct Client {
     pub(super) event_receiver: Receiver<Event>,
     /// 消息发送通道（用于向路由器发送事件）
     pub(super) router_send: Sender<Event>,
+    /// 客户端地址
+    pub(super) addr: std::net::SocketAddr,
 }
 
 impl Client {
     /// 创建新的客户端
-    pub fn new(socket: TcpStream, rx: Receiver<Event>, tx: Sender<Event>, client_id: String) -> Self {
+    pub fn new(socket: TcpStream, addr: std::net::SocketAddr, rx: Receiver<Event>, tx: Sender<Event>, client_id: String) -> Self {
         Self {
             socket: Box::new(socket),
             state: ClientState::Connected,
+            addr,
             client_id,
             keepalive: 60, // 默认保活时间为60秒
             read_buf: BytesMut::with_capacity(1024 * 10),

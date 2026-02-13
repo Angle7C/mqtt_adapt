@@ -173,42 +173,52 @@ impl TopicManager {
     pub async fn find_subscribers(&self, topic: &str) -> Vec<TopicSubscription> {
         let root_guard = self.root.read().await;
         let root = &*root_guard;
-        let mut subscribers = Vec::new();
         let parts: Vec<&str> = topic.split('/').collect();
 
-        // 使用队列来模拟递归调用
+        let mut subscribers_map: HashMap<String, TopicSubscription> = HashMap::new();
         let mut queue = Vec::new();
         queue.push((root, 0));
 
         while let Some((node, index)) = queue.pop() {
             if index == parts.len() {
-                // 到达主题末尾，添加当前节点的订阅者
-                subscribers.extend_from_slice(&node.subscribers);
+                for sub in &node.subscribers {
+                    subscribers_map
+                        .entry(sub.client_id.clone())
+                        .and_modify(|existing| {
+                            if sub.qos > existing.qos {
+                                existing.qos = sub.qos;
+                            }
+                        })
+                        .or_insert_with(|| sub.clone());
+                }
                 continue;
             }
 
             let current_part = parts[index];
 
-            // 处理精确匹配
             if let Some(child) = node.children.get(current_part) {
                 queue.push((child, index + 1));
             }
 
-            // 处理单级通配符 +
             if let Some(child) = node.children.get("+") {
                 queue.push((child, index + 1));
             }
 
-            // 处理多级通配符 #
             if let Some(child) = node.children.get("#") {
-                subscribers.extend_from_slice(&child.subscribers);
+                for sub in &child.subscribers {
+                    subscribers_map
+                        .entry(sub.client_id.clone())
+                        .and_modify(|existing| {
+                            if sub.qos > existing.qos {
+                                existing.qos = sub.qos;
+                            }
+                        })
+                        .or_insert_with(|| sub.clone());
+                }
             }
         }
 
-        // 去重，确保每个客户端只返回一个订阅（使用最高的QoS）
-        self.deduplicate_subscribers(&mut subscribers).await;
-
-        subscribers
+        subscribers_map.into_values().collect()
     }
 
     /// 去重订阅者，保留最高的QoS

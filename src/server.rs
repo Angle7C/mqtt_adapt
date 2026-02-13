@@ -1,7 +1,7 @@
 use crate::{client::Client, routing::router::MessageRouter};
 use log::{error, info};
-use std::net::SocketAddr;
-use tokio::net::TcpListener;
+use std::{net::{SocketAddr, ToSocketAddrs}, os::windows::io::AsRawSocket, thread::{self, Thread}};
+use tokio::net::{TcpListener, TcpSocket};
 
 /// MQTT服务器结构体
 #[derive(Debug, Clone)]
@@ -17,44 +17,44 @@ impl Server {
     pub fn new(addr: SocketAddr) -> Self {
         // 创建路由器
         let router = MessageRouter::new();
-        
-        Self {
-            addr,
-            router,
-        }
+
+        Self { addr, router }
     }
 
     /// 启动服务器
     pub async fn start(&self) {
         // 启动路由器
         let router_clone = self.router.clone();
-        tokio::spawn(async move {
-            router_clone.start().await;
+        thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(async {
+                router_clone.start().await;
+            });
         });
 
         // 绑定TCP监听器
         let listener = TcpListener::bind(&self.addr)
             .await
-            .expect("Failed to bind address");      
+            .expect("Failed to bind address");
 
         info!("MQTT server started on {}", self.addr);
 
         // 处理客户端连接
-        while let Ok((socket, _)) = listener.accept().await {
+        while let Ok((socket, addr)) = listener.accept().await {
+            info!("Accepted connection from {}", addr);
             // 克隆路由器引用
             let router_clone = self.router.clone();
-            
+            socket.set_nodelay(true).expect("close Nagle算法");
             // 处理客户端连接
             tokio::spawn(async move {
-                match crate::client::create_client_with_connect(socket, &router_clone).await {
-                    Ok(client) => {
-                        // 处理客户端连接
-                        if let Err(e) = client.handle().await {
-                            error!("Error handling client: {:?}", e);
-                        }
-                    },
-                    Err(e) => {
-                        error!("Error creating client: {:?}", e);
+                if let Ok(client) =
+                    crate::client::create_client_with_connect(socket, addr, &router_clone).await
+                {
+                    if let Err(e) = client.handle().await {
+                        error!("Error handling client: {:?}", e);
                     }
                 }
             });
@@ -63,6 +63,10 @@ impl Server {
 
     /// 获取路由器实例
     pub fn router(&self) -> &MessageRouter {
+        
+
         &self.router
     }
+
+
 }
