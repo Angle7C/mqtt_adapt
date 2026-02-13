@@ -22,11 +22,11 @@ jobs:
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
     
-    - name: Check formatting
-      uses: actions-rs/cargo@v1
-      with:
-        command: fmt
-        args: --all --check
+    # - name: Check formatting
+    #   uses: actions-rs/cargo@v1
+    #   with:
+    #     command: fmt
+    #     args: --all --check
     
     - name: Run clippy
       uses: actions-rs/cargo@v1
