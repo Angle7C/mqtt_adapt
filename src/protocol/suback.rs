@@ -3,7 +3,7 @@ use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
 use anyhow::Result;
 /// SUBACK数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct SubAckPacket {
     pub packet_id: u16,
     pub return_codes: u8,

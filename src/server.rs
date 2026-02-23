@@ -1,3 +1,4 @@
+use crate::db::connection::DatabaseConnection;
 use crate::routing::router::MessageRouter;
 use log::{error, info};
 use std::{net::SocketAddr, thread::{self}};
@@ -10,6 +11,8 @@ pub struct Server {
     addr: SocketAddr,
     /// 消息路由器
     router: MessageRouter,
+    /// 数据库连接
+    db: Option<DatabaseConnection>,
 }
 
 impl Server {
@@ -18,7 +21,13 @@ impl Server {
         // 创建路由器
         let router = MessageRouter::new();
 
-        Self { addr, router }
+        Self { addr, router, db: None }
+    }
+    
+    /// 设置数据库连接
+    pub fn with_database(mut self, db: DatabaseConnection) -> Self {
+        self.db = Some(db);
+        self
     }
 
     /// 启动服务器
@@ -40,21 +49,28 @@ impl Server {
             .expect("Failed to bind address");
     
         info!("MQTT server started on {}", self.addr);
+        
 
         // 处理客户端连接
         while let Ok((socket, addr)) = listener.accept().await {
             info!("Accepted connection from {}", addr);
-            // 克隆路由器引用
+            // 克隆路由器和数据库连接引用
             let router_clone = self.router.clone();
+            let db_clone = self.db.clone();
             socket.set_nodelay(true).expect("close Nagle算法");
             // 处理客户端连接
             tokio::spawn(async move {
-                if let Ok(client) =
-                    crate::client::create_client_with_connect(socket, addr, &router_clone).await
-                {
-                    if let Err(e) = client.handle().await {
-                        error!("Error handling client: {:?}", e);
+                if let Some(db) = db_clone {
+                    if let Ok(client) =
+                        crate::client::create_client_with_connect(socket, addr, &router_clone, &db).await
+                    {
+                        if let Err(e) = client.handle().await {
+                            error!("Error handling client: {:?}", e);
+                        }
                     }
+                } else {
+                    error!("Database connection not available for client: {}", addr);
+                    // 这里可以添加代码来关闭连接或发送拒绝消息
                 }
             });
         }

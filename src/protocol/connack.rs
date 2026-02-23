@@ -7,7 +7,7 @@ use anyhow::Result;
 
 
 /// CONNACK数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct ConnAckPacket {
     pub session_present: bool,
     pub return_code: ConnectReturnCode,

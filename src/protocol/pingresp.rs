@@ -3,7 +3,7 @@ use super::Packet;use anyhow::Result;
 
 /// PINGRESP数据包
 /// MQTT PINGRESP数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct PingRespPacket;
 
 impl Packet for PingRespPacket {

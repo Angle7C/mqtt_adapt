@@ -3,7 +3,7 @@ use super::Packet;
 use bytes::{Buf, BufMut, BytesMut};
 use anyhow::Result;
 /// PUBACK数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct PubAckPacket {
     pub packet_id: u16,
 }

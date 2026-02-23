@@ -6,7 +6,7 @@ use anyhow::Result;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 /// PUBLISH数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,Clone,  PartialEq, Eq)]
 pub struct PublishPacket {
     pub dup: bool,
     pub qos: u8,

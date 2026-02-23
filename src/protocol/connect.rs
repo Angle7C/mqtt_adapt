@@ -7,7 +7,7 @@ use super::write_remaining_length;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use anyhow::Result;
 /// CONNECT数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ConnectPacket {
     pub protocol_name: String,
     pub protocol_level: u8,

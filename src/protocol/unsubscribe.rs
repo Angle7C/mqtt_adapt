@@ -5,7 +5,7 @@ use super::write_remaining_length;
 use bytes::{Buf, BufMut, BytesMut};
 use anyhow::Result;
 /// UNSUBSCRIBE数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct UnsubscribePacket {
     pub packet_id: u16,
     pub topics: Vec<String>,

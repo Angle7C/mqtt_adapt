@@ -3,7 +3,7 @@ use super::Packet;
 use anyhow::Result;
 /// DISCONNECT数据包
 /// MQTT DISCONNECT数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug,  PartialEq, Eq)]
 pub struct DisconnectPacket;
 
 impl Packet for DisconnectPacket {

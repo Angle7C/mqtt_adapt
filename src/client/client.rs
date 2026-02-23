@@ -35,6 +35,14 @@ pub struct Client {
     pub(super) router_send: Sender<Event>,
     /// 客户端地址
     pub(super) addr: std::net::SocketAddr,
+    /// 遗嘱主题
+    pub(super) will_topic: Option<String>,
+    /// 遗嘱消息
+    pub(super) will_message: Option<bytes::Bytes>,
+    /// 遗嘱QoS
+    pub(super) will_qos: u8,
+    /// 遗嘱保留标志
+    pub(super) will_retain: bool,
 }
 
 impl Client {
@@ -50,6 +58,10 @@ impl Client {
             write_buf: BytesMut::with_capacity(1024 * 10),
             event_receiver:rx,
             router_send: tx,
+            will_topic: None,
+            will_message: None,
+            will_qos: 0,
+            will_retain: false,
         }
     }
 

@@ -1,6 +1,6 @@
-use mqtt_adapt::server::Server;
-use tracing::Level;
 use mimalloc::MiMalloc;
+use mqtt_adapt::{db::connection::DatabaseConnection, server::Server};
+use tracing::Level;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -14,10 +14,18 @@ fn main() {
         .build()
         .unwrap();
     rt.block_on(async {
-        // 服务器地址
+        // 初始化数据库连接
+        let db = match DatabaseConnection::new("sqlite://mqtt_adapt.db").await {
+            Ok(db) => db,
+            Err(e) => {
+                eprintln!("Failed to initialize database: {:?}", e);
+                return;
+            }
+        };
 
         // 创建服务器
-        let server = Server::new("127.0.0.1:1883".parse().unwrap());
+        let server = Server::new("127.0.0.1:1883".parse().unwrap())
+            .with_database(db);
 
         // 启动服务器
         server.start().await;
@@ -26,3 +34,4 @@ fn main() {
 fn init_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 }
+

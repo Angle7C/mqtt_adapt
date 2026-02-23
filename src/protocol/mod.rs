@@ -350,7 +350,7 @@ impl ConnectReturnCode {
 }
 
 /// MQTT数据包
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MqttPacket {
     Connect(connect::ConnectPacket),
     ConnAck(connack::ConnAckPacket),

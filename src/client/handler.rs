@@ -6,7 +6,7 @@ use tokio::time::Duration;
 use crate::client::client::Client;
 use crate::protocol::{DisconnectPacket, MqttPacket, Packet};
 use crate::routing::event::Event;
-
+use crate::protocol::PublishPacket;
 impl Client {
     /// 处理客户端连接
     pub async fn handle(mut self) -> Result<()> {
@@ -138,9 +138,29 @@ impl Client {
 
     /// 通知客户端断开连接
     async fn notify_disconnection(&mut self) -> Result<()> {
+        // 处理遗嘱信息
+        if let Some(will_topic) = &self.will_topic {
+            if let Some(will_message) = &self.will_message {
+                // 创建遗嘱发布消息
+                // 创建Publish数据包
+                let publish_packet = PublishPacket {
+                    dup: false,
+                    qos: self.will_qos,
+                    retain: self.will_retain,
+                    topic_name: will_topic.clone(),
+                    packet_id: None, // QoS 0不需要packet_id
+                    payload: will_message.clone(),
+                };
+                
+                // 将Publish数据包发送到路由器
+                let event = Event::MessageReceived(self.client_id.clone(), MqttPacket::Publish(publish_packet));
+                self.send_event(event)?;
+            }
+        }
+        
+        // 通知客户端断开连接
         let event = Event::ClientDisconnected(self.client_id.clone());
         self.send_event(event)
-        // Ok(())
     }
 
     /// 处理来自router的事件

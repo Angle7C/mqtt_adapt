@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex};
 use flume::{Receiver, Sender, unbounded};
 use anyhow::Result;
-                use crate::protocol::{ConnAckPacket, ConnectReturnCode, MqttPacket};
+use crate::protocol::{ConnAckPacket, ConnectReturnCode, MqttPacket};
 /// 消息路由结构体
 #[derive(Debug, Clone)]
 pub struct MessageRouter {
@@ -19,12 +19,16 @@ pub struct MessageRouter {
     event_sender: Sender<Event>,
     /// 事件通道管理器
     event_receiver: Receiver<Event>,
+    // 数据库管理器
 }
 
 impl MessageRouter {
     /// 创建新的消息路由器
     pub fn new() -> Self {
         let (tx, rx) = unbounded();
+        
+        // 初始化默认用户
+        
         Self {
             topic_manager: Arc::new(Mutex::new(TopicManager::new())),
             sender: Arc::new(Mutex::new(HashMap::new())),
@@ -40,6 +44,10 @@ impl MessageRouter {
     pub async fn register_client(&self, client_id: &str, sender: Sender<Event>) -> Result<()> {
         let mut senders = self.sender.lock().await;
         senders.insert(client_id.to_string(), sender);
+        
+        // 在数据库中注册客户端
+        
+        
         Ok(())
     }
 
@@ -47,6 +55,8 @@ impl MessageRouter {
     pub async fn remove_client(&self, client_id: &str) {
         let mut senders = self.sender.lock().await;
         senders.remove(client_id);
+        
+      
     }
 
     /// 处理事件
@@ -121,6 +131,8 @@ impl MessageRouter {
             // 添加订阅
             topic_manager.add_subscription(client_id.clone(), topic_filter.to_string(), *qos).await;
             code=*qos; // 返回实际的QoS级别
+            
+          
         }
         
         // 构建SUBACK数据包
@@ -148,6 +160,8 @@ impl MessageRouter {
         // 处理每个取消订阅主题
         for topic_filter in &unsubscribe_packet.topics {
             topic_manager.remove_subscription(client_id.clone(), topic_filter.to_string()).await;
+            
+           
         }
         
         // 构建UNSUBACK数据包
@@ -167,8 +181,11 @@ impl MessageRouter {
     }
     
     /// 处理发布消息
-    async fn handle_publish(&self, _client_id: ClinetId, publish_packet: crate::protocol::PublishPacket) {
+    async fn handle_publish(&self, _client_id: ClinetId, mut publish_packet: crate::protocol::PublishPacket) {
         let topic = publish_packet.topic_name.clone();
+        
+        // 保存消息到数据库，特别是保留消息
+        
         
         let subscribers = {
             let topic_manager = self.topic_manager.lock().await;
@@ -182,10 +199,9 @@ impl MessageRouter {
         let senders = self.sender.lock().await;
         for subscriber in subscribers {
             if let Some(tx) = senders.get(&subscriber.client_id) {
-                let mut pub_packet = publish_packet.clone();
-                pub_packet.qos = subscriber.qos;
-                
-                let mqtt_packet = MqttPacket::Publish(pub_packet);
+               
+                publish_packet.qos  = subscriber.qos;
+                let mqtt_packet = MqttPacket::Publish(publish_packet.clone());
                 let event = Event::MessageSent(subscriber.client_id.clone(), mqtt_packet);
                 if let Err(_e) = tx.try_send(event) {
                 }
