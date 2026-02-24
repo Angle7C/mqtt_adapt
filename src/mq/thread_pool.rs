@@ -24,7 +24,6 @@ impl MqThreadPool {
     /// # 示例
     /// ```
     /// // 创建一个包含4个线程的线程池
-    /// let thread_pool = MqThreadPool::new(4).await?;
     /// ```
     pub async fn new(size: usize) -> Result<Self> {
         let (tx, rx) = mpsc::channel::<MqTask>(100);

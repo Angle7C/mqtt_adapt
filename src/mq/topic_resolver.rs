@@ -24,7 +24,6 @@ impl TopicResolver {
     /// # 示例
     /// ```
     /// // 创建解析器，topic 格式为 "{node_id}/{device_id}/data"
-    /// let resolver = TopicResolver::new("{node_id}/{device_id}/data").unwrap();
     /// ```
     pub fn new(topic_pattern: &str) -> Result<Self> {
         // 构建正则表达式
