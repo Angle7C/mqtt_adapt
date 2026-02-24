@@ -1,54 +1,65 @@
 use std::collections::HashMap;
+use bytes::Bytes;
+use sqlx::SqlitePool;
+use crate::db::models::retained_message::RetainedMessage as DbRetainedMessage;
 
-/// 主题订阅结构体
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TopicSubscription {
-    /// 客户端ID
     pub client_id: String,
-    /// 订阅的主题
     pub topic: String,
-    /// QoS等级
     pub qos: u8,
 }
 
-/// 主题节点结构体
+#[derive(Debug, Clone)]
+pub struct RetainedMessage {
+    pub payload: Bytes,
+    pub qos: u8,
+}
+
 #[derive(Debug, Clone)]
 pub struct TopicNode {
-    /// 主题名称
     pub topic: String,
-    /// 子节点
     pub children: HashMap<String, TopicNode>,
-    /// 订阅者列表
     pub subscribers: Vec<TopicSubscription>,
+    pub retained_message: Option<RetainedMessage>,
 }
 
 impl TopicNode {
-    /// 创建新的主题节点
     pub fn new(topic: String) -> Self {
         Self {
             topic,
             children: HashMap::new(),
             subscribers: Vec::new(),
+            retained_message: None,
         }
     }
 }
 
-/// 主题管理器结构体
 #[derive(Debug, Clone)]
 pub struct TopicManager {
-    /// 根节点
     pub root: TopicNode,
+    db_pool: Option<SqlitePool>,
 }
 
 impl TopicManager {
-    /// 创建新的主题管理器
     pub fn new() -> Self {
         Self {
             root: TopicNode::new("root".to_string()),
+            db_pool: None,
         }
     }
 
-    /// 添加订阅
+    pub fn with_db(pool: SqlitePool) -> Self {
+        Self {
+            root: TopicNode::new("root".to_string()),
+            db_pool: Some(pool),
+        }
+    }
+
+    pub fn set_db_pool(&mut self, pool: SqlitePool) {
+        self.db_pool = Some(pool);
+    }
+
     pub async fn add_subscription(&mut self, client_id: String, topic: String, qos: u8) {
         let mut current = &mut self.root;
         let parts: Vec<&str> = topic.split('/').collect();
@@ -57,7 +68,6 @@ impl TopicManager {
             current = current.children.entry(part.to_string()).or_insert_with(|| TopicNode::new(part.to_string()));
         }
 
-        // 检查是否已经存在相同的订阅
         let existing_subscription = current.subscribers.iter().find(|s| s.client_id == client_id);
         if existing_subscription.is_none() {
             current.subscribers.push(TopicSubscription {
@@ -68,7 +78,6 @@ impl TopicManager {
         }
     }
 
-    /// 移除订阅
     pub async fn remove_subscription(&mut self, client_id: String, topic: String) {
         let mut current = &mut self.root;
         let parts: Vec<&str> = topic.split('/').collect();
@@ -81,44 +90,78 @@ impl TopicManager {
             }
         }
 
-        // 移除订阅
         current.subscribers.retain(|s| s.client_id != client_id);
     }
 
-    /// 查找订阅者
     pub async fn find_subscribers(&self, topic: &str) -> Vec<TopicSubscription> {
         let mut subscribers = Vec::new();
         let parts: Vec<&str> = topic.split('/').collect();
 
-        // 精确匹配
         self.match_topic(&self.root, &parts, 0, &mut subscribers);
 
         subscribers
     }
 
-    /// 匹配主题
     fn match_topic(&self, node: &TopicNode, parts: &[&str], index: usize, subscribers: &mut Vec<TopicSubscription>) {
         if index == parts.len() {
-            // 找到匹配的主题，添加订阅者
             subscribers.extend(node.subscribers.clone());
             return;
         }
 
         let part = parts[index];
 
-        // 匹配子节点
         if let Some(child) = node.children.get(part) {
             self.match_topic(child, parts, index + 1, subscribers);
         }
 
-        // 匹配通配符 #
         if let Some(child) = node.children.get("#") {
             subscribers.extend(child.subscribers.clone());
         }
 
-        // 匹配通配符 +
         if let Some(child) = node.children.get("+") {
             self.match_topic(child, parts, index + 1, subscribers);
         }
+    }
+
+    pub async fn store_retained_message(&mut self, topic: String, payload: Bytes, qos: u8) {
+        if let Some(pool) = &self.db_pool {
+            if payload.is_empty() {
+                if let Err(e) = DbRetainedMessage::delete(pool, &topic).await {
+                    log::error!("Failed to delete retained message: {}", e);
+                }
+            } else {
+                if let Err(e) = DbRetainedMessage::store(pool, &topic, payload, qos).await {
+                    log::error!("Failed to store retained message: {}", e);
+                }
+            }
+        }
+    }
+
+    pub async fn get_retained_messages(&self, topic_filter: &str) -> Vec<(String, RetainedMessage)> {
+        let mut messages = Vec::new();
+
+        if let Some(pool) = &self.db_pool {
+            match DbRetainedMessage::find_matching(pool, topic_filter).await {
+                Ok(db_messages) => {
+                    for db_msg in db_messages {
+                        let topic = db_msg.topic.clone();
+                        let payload = db_msg.payload_bytes();
+                        let qos = db_msg.qos_u8();
+                        messages.push((
+                            topic,
+                            RetainedMessage {
+                                payload,
+                                qos,
+                            },
+                        ));
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to get retained messages: {}", e);
+                }
+            }
+        }
+
+        messages
     }
 }
