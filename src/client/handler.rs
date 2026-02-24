@@ -111,6 +111,7 @@ impl Client {
     }
 
     /// 发送断开连接数据包
+    #[allow(dead_code)]
     async fn send_disconnect_packet(&mut self) -> Result<()> {
         // 创建Disconnect数据包
         let disconnect_packet = DisconnectPacket;

@@ -34,6 +34,7 @@ pub struct Client {
     /// 消息发送通道（用于向路由器发送事件）
     pub(super) router_send: Sender<Event>,
     /// 客户端地址
+    #[allow(dead_code)]
     pub(super) addr: std::net::SocketAddr,
     /// 遗嘱主题
     pub(super) will_topic: Option<String>,

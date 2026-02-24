@@ -290,3 +290,143 @@ fn test_mqtt_packet_read() {
         }
     }
 }
+
+// 测试带有用户名和密码的CONNECT数据包
+#[test]
+fn test_connect_packet_with_credentials() {
+    let mut buffer = BytesMut::new();
+    // 写入MQTT协议名称和版本
+    buffer.put_u16(4); // 协议名称长度
+    buffer.put_slice(b"MQTT"); // 协议名称
+    buffer.put_u8(4); // 协议级别
+    buffer.put_u8(0xC2); // 连接标志 (用户名和密码)
+    buffer.put_u16(60); // 保持连接时间
+    buffer.put_u16(11); // 客户端ID长度
+    buffer.put_slice(b"test_client"); // 客户端ID
+    buffer.put_u16(8); // 用户名长度
+    buffer.put_slice(b"username"); // 用户名
+    buffer.put_u16(8); // 密码长度
+    buffer.put_slice(b"password"); // 密码
+    
+    let result = ConnectPacket::parse(&mut buffer, None);
+    assert!(result.is_ok());
+    let packet = result.unwrap();
+    assert_eq!(packet.protocol_name, "MQTT");
+    assert_eq!(packet.client_id, "test_client");
+    assert_eq!(packet.username, Some("username".to_string()));
+    assert_eq!(packet.password, Some(Bytes::from_static(b"password")));
+}
+
+// 测试带有遗嘱消息的CONNECT数据包
+#[test]
+fn test_connect_packet_with_will() {
+    let mut buffer = BytesMut::new();
+    // 写入MQTT协议名称和版本
+    buffer.put_u16(4); // 协议名称长度
+    buffer.put_slice(b"MQTT"); // 协议名称
+    buffer.put_u8(4); // 协议级别
+    buffer.put_u8(0x06); // 连接标志 (遗嘱消息)
+    buffer.put_u16(60); // 保持连接时间
+    buffer.put_u16(11); // 客户端ID长度
+    buffer.put_slice(b"test_client"); // 客户端ID
+    buffer.put_u16(10); // 遗嘱主题长度
+    buffer.put_slice(b"will/topic"); // 遗嘱主题
+    buffer.put_u16(12); // 遗嘱消息长度
+    buffer.put_slice(b"will message"); // 遗嘱消息
+    
+    let result = ConnectPacket::parse(&mut buffer, None);
+    assert!(result.is_ok());
+    let packet = result.unwrap();
+    assert_eq!(packet.protocol_name, "MQTT");
+    assert_eq!(packet.client_id, "test_client");
+    assert_eq!(packet.will_topic, Some("will/topic".to_string()));
+    assert_eq!(packet.will_message, Some(Bytes::from_static(b"will message")));
+}
+
+// 测试QoS 1的PUBLISH数据包
+#[test]
+fn test_publish_packet_qos1() {
+    let mut buffer = BytesMut::new();
+    // 写入主题名、数据包ID和载荷
+    buffer.put_u16(10); // 主题名长度
+    buffer.put_slice(b"test/topic"); // 主题名
+    buffer.put_u16(1234); // 数据包ID
+    buffer.put_slice(b"test payload"); // 载荷
+    
+    let result = PublishPacket::parse(&mut buffer, Some(0x02)); // QoS 1
+    assert!(result.is_ok());
+    let packet = result.unwrap();
+    assert_eq!(packet.topic_name, "test/topic");
+    assert_eq!(packet.payload, Bytes::from_static(b"test payload"));
+    assert_eq!(packet.qos, 1);
+    assert_eq!(packet.packet_id, Some(1234));
+}
+
+// 测试多个主题的SUBSCRIBE数据包
+#[test]
+fn test_subscribe_packet_multiple_topics() {
+    let mut buffer = BytesMut::new();
+    // 写入数据包ID
+    buffer.put_u16(7890);
+    // 写入第一个主题过滤器和QoS
+    buffer.put_u16(11); // 主题长度
+    buffer.put_slice(b"test/topic1"); // 主题
+    buffer.put_u8(0x01); // QoS级别
+    // 写入第二个主题过滤器和QoS
+    buffer.put_u16(11); // 主题长度
+    buffer.put_slice(b"test/topic2"); // 主题
+    buffer.put_u8(0x02); // QoS级别
+    
+    let result = SubscribePacket::parse(&mut buffer, None);
+    assert!(result.is_ok());
+    let packet = result.unwrap();
+    assert_eq!(packet.packet_id, 7890);
+    assert_eq!(packet.topics.len(), 2);
+    assert_eq!(packet.topics[0].0, "test/topic1");
+    assert_eq!(packet.topics[0].1, 1);
+    assert_eq!(packet.topics[1].0, "test/topic2");
+    assert_eq!(packet.topics[1].1, 2);
+}
+
+// 测试MqttPacket::read方法对PUBLISH数据包的支持
+#[test]
+fn test_mqtt_packet_read_publish() {
+    let mut buffer = BytesMut::new();
+    // 写入PUBLISH数据包
+    buffer.put_u8(0x30); // 固定头: PUBLISH类型
+    buffer.put_u8(0x1A); // 剩余长度
+    buffer.put_u16(10); // 主题名长度
+    buffer.put_slice(b"test/topic"); // 主题名
+    buffer.put_slice(b"test payload message"); // 载荷
+    
+    let result = MqttPacket::read(&mut buffer);
+    assert!(result.is_ok());
+    match result.unwrap() {
+        MqttPacket::Publish(_) => {
+            // 验证是PUBLISH数据包
+        }
+        _ => {
+            panic!("Expected PUBLISH packet");
+        }
+    }
+}
+
+// 测试数据包解析错误情况
+#[test]
+fn test_packet_parse_error() {
+    // 测试数据不足的情况
+    let mut buffer = BytesMut::new();
+    // 只写入协议名称长度，没有写入协议名称
+    buffer.put_u16(4);
+    
+    let result = ConnectPacket::parse(&mut buffer, None);
+    assert!(result.is_err());
+    
+    // 测试固定头解析错误
+    let mut buffer = BytesMut::new();
+    // 只写入类型字节，没有写入剩余长度
+    buffer.put_u8(0x10);
+    
+    let result = FixedHeader::parse(&mut buffer);
+    assert!(result.is_err());
+}

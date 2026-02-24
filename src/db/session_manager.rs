@@ -1,7 +1,7 @@
 
 use anyhow::Result;
 use sqlx::SqlitePool;
-use log::{info, error};
+use log::info;
 
 use crate::db::models::session::{Session, SessionSubscription, OfflineMessage};
 use crate::protocol::PublishPacket;

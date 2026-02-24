@@ -192,7 +192,7 @@ impl MessageRouter {
         }
     }
     
-    async fn handle_publish(&self, client_id: ClinetId, mut publish_packet: crate::protocol::PublishPacket) {
+    async fn handle_publish(&self, client_id: ClinetId, publish_packet: crate::protocol::PublishPacket) {
         let topic = publish_packet.topic_name.clone();
         let retain = publish_packet.retain;
         let qos = publish_packet.qos;

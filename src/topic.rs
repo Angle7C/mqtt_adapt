@@ -123,7 +123,53 @@ impl TopicManager {
         }
     }
 
+    fn find_retained_messages(&self, node: &TopicNode, parts: &[&str], index: usize, messages: &mut Vec<(String, RetainedMessage)>, original_filter: &str) {
+        if index == parts.len() {
+            if let Some(retained) = &node.retained_message {
+                // 构建完整的主题路径
+                let topic = original_filter.to_string();
+                messages.push((topic, retained.clone()));
+            }
+            return;
+        }
+
+        let part = parts[index];
+
+        if let Some(child) = node.children.get(part) {
+            self.find_retained_messages(child, parts, index + 1, messages, original_filter);
+        }
+
+        if let Some(child) = node.children.get("#") {
+            if let Some(retained) = &child.retained_message {
+                let topic = original_filter.to_string();
+                messages.push((topic, retained.clone()));
+            }
+        }
+
+        if let Some(child) = node.children.get("+") {
+            self.find_retained_messages(child, parts, index + 1, messages, original_filter);
+        }
+    }
+
     pub async fn store_retained_message(&mut self, topic: String, payload: Bytes, qos: u8) {
+        // 存储到内存中
+        let mut current = &mut self.root;
+        let parts: Vec<&str> = topic.split('/').collect();
+
+        for part in parts {
+            current = current.children.entry(part.to_string()).or_insert_with(|| TopicNode::new(part.to_string()));
+        }
+
+        if payload.is_empty() {
+            current.retained_message = None;
+        } else {
+            current.retained_message = Some(RetainedMessage {
+                payload: payload.clone(),
+                qos,
+            });
+        }
+
+        // 存储到数据库（如果有）
         if let Some(pool) = &self.db_pool {
             if payload.is_empty() {
                 if let Err(e) = DbRetainedMessage::delete(pool, &topic).await {
@@ -140,6 +186,11 @@ impl TopicManager {
     pub async fn get_retained_messages(&self, topic_filter: &str) -> Vec<(String, RetainedMessage)> {
         let mut messages = Vec::new();
 
+        // 从内存中获取
+        let parts: Vec<&str> = topic_filter.split('/').collect();
+        self.find_retained_messages(&self.root, &parts, 0, &mut messages, topic_filter);
+
+        // 从数据库中获取（如果有）
         if let Some(pool) = &self.db_pool {
             match DbRetainedMessage::find_matching(pool, topic_filter).await {
                 Ok(db_messages) => {

@@ -34,5 +34,5 @@ impl Default for MqClientConfig {
 /// MQ客户端工厂trait
 pub trait MqClientFactory {
     /// 创建MQ客户端
-    async fn create_client(&self, config: MqClientConfig) -> Result<Box<dyn MqProducer>>;
+    fn create_client(&self, config: MqClientConfig) -> impl std::future::Future<Output = Result<Box<dyn MqProducer>>> + Send;
 }
