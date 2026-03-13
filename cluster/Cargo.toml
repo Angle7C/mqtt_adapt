@@ -1,0 +1,17 @@
+[package]
+name = "cluster"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+anyhow.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bytes.workspace = true
+uuid.workspace = true
+rand.workspace = true
+
+# Nacos 客户端依赖
+nacos-sdk = { version = "0.6", features = ["default"] }
