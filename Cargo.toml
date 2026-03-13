@@ -1,9 +1,12 @@
-[package]
-name = "mqtt_adapt"
+[workspace]
+members = ["mq", "mqtt"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[workspace.dependencies]
 tokio = { version = "1.35", features = ["full"] }
 bytes = "1.5"
 nom = "7.1"
@@ -24,14 +27,6 @@ uuid = { version = "1.6", features = ["v4"] }
 regex = "1.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-[dev-dependencies]
 criterion = "0.5"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
 rumqttc = "0.24"
 rand = "0.10.0"
-
-[[bench]]
-name = "performance"
-harness = false

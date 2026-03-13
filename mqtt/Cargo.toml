@@ -1,0 +1,39 @@
+[package]
+name = "mqtt"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+tokio.workspace = true
+bytes.workspace = true
+nom.workspace = true
+log.workspace = true
+env_logger.workspace = true
+tracing.workspace = true
+tracing-log.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+flume.workspace = true
+libc.workspace = true
+num_cpus.workspace = true
+mimalloc.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+uuid.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+mq = { path = "../mq" }
+
+[dev-dependencies]
+criterion.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rumqttc.workspace = true
+rand.workspace = true
+
+[[bench]]
+name = "performance"
+harness = false
