@@ -70,7 +70,7 @@ impl NacosClient {
         .enable_auth_plugin_http()
         .build()
         .await?;
-        let mut naming_service = NamingServiceBuilder::new(
+        let naming_service = NamingServiceBuilder::new(
             ClientProps::new()
                 .server_addr(config.server_addr.clone())
                 .namespace(config.namespace.clone().unwrap_or_else(|| "".to_string()))

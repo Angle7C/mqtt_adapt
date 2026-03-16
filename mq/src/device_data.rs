@@ -69,7 +69,7 @@ impl DeviceDataService {
         
         // 发送消息到MQ
         // 这里可以根据需要添加响应回调
-        let response_topic = format!("{}/response", topic);
+        let _response_topic = format!("{}/response", topic);
         Ok(())
         
        

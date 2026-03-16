@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use uuid::Uuid;
 
 /// 集群节点信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
