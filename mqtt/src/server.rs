@@ -1,5 +1,5 @@
 use crate::db::connection::DatabaseConnection;
-use crate::routing::router::MessageRouter;
+use crate::routing::optimized_router::OptimizedMessageRouter;
 use log::{error, info};
 use std::{net::SocketAddr, thread::{self}};
 use tokio::net::TcpListener;
@@ -10,7 +10,7 @@ pub struct Server {
     /// 服务器地址
     addr: SocketAddr,
     /// 消息路由器
-    router: MessageRouter,
+    router: OptimizedMessageRouter,
     /// 数据库连接
     db: Option<DatabaseConnection>,
 }
@@ -19,7 +19,7 @@ impl Server {
     /// 创建新的MQTT服务器
     pub fn new(addr: SocketAddr) -> Self {
         // 创建路由器
-        let router = MessageRouter::new();
+        let router = OptimizedMessageRouter::new();
 
         Self { addr, router, db: None }
     }
@@ -77,7 +77,7 @@ impl Server {
     }
 
     /// 获取路由器实例
-    pub fn router(&self) -> &MessageRouter {
+    pub fn router(&self) -> &OptimizedMessageRouter {
         
 
         &self.router

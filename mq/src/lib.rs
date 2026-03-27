@@ -10,6 +10,7 @@ pub mod consumer_manager;
 
 pub use consumer::{MqConsumer, MqConsumerService};
 pub use producer::MqProducer;
+pub use producer_service::MqProducerService;
 pub use message::MqMessage;
 pub use device_data::{DeviceData, DeviceDataService, DeviceEventType};
 pub use factory::{MqClientFactory, MqClientConfig};

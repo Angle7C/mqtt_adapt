@@ -48,7 +48,11 @@ pub struct Client {
 
 impl Client {
     /// 创建新的客户端
-    pub fn new(socket: TcpStream, addr: std::net::SocketAddr, rx: Receiver<Event>, tx: Sender<Event>, client_id: String) -> Self {
+    pub fn new(socket: TcpStream, 
+               addr: std::net::SocketAddr,
+               rx: Receiver<Event>, 
+               tx: Sender<Event>, 
+               client_id: String) -> Self {
         Self {
             socket: BufReader::new(socket),
             state: ClientState::Connected,
@@ -65,9 +69,6 @@ impl Client {
             will_retain: false,
         }
     }
-
-
-
     /// 发送事件到路由器
     pub fn send_event(&self, event: Event) -> Result<()> {
         self.router_send.send(event)?;

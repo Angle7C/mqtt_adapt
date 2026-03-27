@@ -61,12 +61,13 @@ impl Client {
                         self.handle_ping_req().await?;
                     }
                     MqttPacket::Disconnect(_) => {
+                        info!("Client {} sent Disconnect packet", self.client_id);
                         // 直接关闭连接
                         self.close().await?;
                     }
                     _ => {
                         // 其他包发送到路由中
-                        let event = Event::MessageReceived(self.client_id.clone(), packet);
+                        let event = Event::MessageReceived(self.client_id.clone(),packet);
                         self.send_event(event)?;
                     }
                 }
@@ -96,11 +97,6 @@ impl Client {
 
     /// 处理超时
     async fn close(&mut self) -> Result<()> {
-        // if self.socket.writable().await.is_ok() {
-        //     // 发送断开连接数据包
-        //     self.send_disconnect_packet().await?;
-        // }
-
         // 通知客户端断开连接
         self.notify_disconnection().await?;
 
@@ -125,11 +121,8 @@ impl Client {
 
     /// 处理PingReq数据包
     async fn handle_ping_req(&mut self) -> Result<()> {
-        // 创建PingResp数据包
-        use crate::protocol::PingRespPacket;
-
         // 写入到缓冲区
-        PingRespPacket.write(&mut self.write_buf);
+        crate::protocol::PingRespPacket.write(&mut self.write_buf);
 
         // 发送数据包
         self.write().await?;

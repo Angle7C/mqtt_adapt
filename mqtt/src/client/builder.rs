@@ -8,7 +8,7 @@ use crate::db::connection::DatabaseConnection;
 use crate::db::models::ag_user::User;
 use crate::protocol::MqttPacket;
 use crate::protocol::{ConnAckPacket, ConnectReturnCode};
-use crate::routing::router::MessageRouter;
+use crate::routing::optimized_router::OptimizedMessageRouter;
 /// 从TCP流创建客户端并处理CONNECT数据包
 ///
 /// 1. 创建客户端事件通道
@@ -20,7 +20,7 @@ use crate::routing::router::MessageRouter;
 pub async fn create_client_with_connect(
     socket: TcpStream,
     addr: std::net::SocketAddr,
-    router: &MessageRouter,
+    router: &OptimizedMessageRouter,
     db: &DatabaseConnection,
 ) -> Result<Client> {
     // 创建客户端事件通道

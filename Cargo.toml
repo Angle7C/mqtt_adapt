@@ -1,5 +1,5 @@
 [workspace]
-members = ["mq", "mqtt", "cluster"]
+members = ["mq", "mqtt", "cluster", "server"]
 resolver = "2"
 
 [workspace.package]

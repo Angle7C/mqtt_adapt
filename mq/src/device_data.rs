@@ -57,8 +57,6 @@ impl DeviceDataService {
         let mut message = MqMessage::new(
             &topic,
             Bytes::from(payload),
-            1, // QoS 1，确保消息至少送达一次
-            false,
             &data.node_id
         );
         

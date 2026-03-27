@@ -12,8 +12,8 @@ pub trait MqProducer: Send + Sync {
     async fn send_message(&self, message: MqMessage) -> Result<()>;
     
     /// 发送原始消息（字节形式）
-    async fn send_raw_message(&self, topic: &str, payload: &[u8], qos: u8, retain: bool) -> Result<()> {
-        let message = MqMessage::new(topic, bytes::Bytes::copy_from_slice(payload), qos, retain, "default");
+    async fn send_raw_message(&self, topic: &str, payload: &[u8]) -> Result<()> {
+        let message = MqMessage::new(topic, bytes::Bytes::copy_from_slice(payload), "default");
         self.send_message(message).await
     }
     
